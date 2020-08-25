@@ -1,4 +1,4 @@
-name := "_"
+name := "matrix"
 
 version := "0.1"
 

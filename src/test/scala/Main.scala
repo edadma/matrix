@@ -1,4 +1,4 @@
-package xyz.hyperreal.name
+package xyz.hyperreal.matrix
 
 
 object Main extends App {
