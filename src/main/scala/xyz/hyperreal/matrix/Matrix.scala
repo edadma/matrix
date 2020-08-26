@@ -1,28 +1,12 @@
 package xyz.hyperreal.matrix
 
-import
-abstract class Matrix extends ((Int, Int) => Number) {
+import scala.collection.immutable.ArraySeq
 
-  val rows: Int
-  val cols: Int
+import xyz.hyperreal.table.TextTable
 
-  def +(that: Matrix): Matrix =
-    new Matrix {
-      val rows: Int = Matrix.this.rows
-      val cols: Int = Matrix.this.cols
+class Matrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) {
 
-      require( rows == that.rows && cols == that.cols, "Matrix: only matrices of equal dimension can be added")
-
-      def apply(row: Int, col: Int): Number = this(row, col)
-    }
-}
-
-class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) extends Matrix {
-
-  private val data = Array.ofDim[Number](rows, cols)
-
-  for (i <- 1 to rows; j <- 1 to cols)
-    data(i - 1)(j - 1) = init(i, j)
+  private val data = ArraySeq.tabulate[Number](rows, cols)((x: Int, y: Int) => init(x + 1, y + 1))
 
   def apply(row: Int, col: Int): Number = {
     require(0 < row && row <= rows, s"Matrix: row out of range: $row")
@@ -30,15 +14,36 @@ class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) e
     data(row - 1)(col - 1)
   }
 
+  def operation(that: Matrix, op: (Int, Int, Matrix, Matrix) => Number): Matrix =
+    new Matrix(rows, cols, op(_, _, this, that))
+
+  def element(that: Matrix, name: String, op: (Int, Int, Matrix, Matrix) => Number): Matrix = {
+    require(rows == that.rows && cols == that.cols, s"Matrix.$name: only matrices of equal dimension can be added")
+
+    operation(that, op)
+  }
+
+  def add(that: Matrix): Matrix =
+    element(that, "add", (i: Int, j: Int, a: Matrix, b: Matrix) => a(i, j).doubleValue + b(i, j).doubleValue)
+
+  def +(that: Matrix): Matrix = add(that)
+
+  override def toString: String =
+    new TextTable() {
+      data foreach { r =>
+        rowSeq(r)
+      }
+    }.toString
 }
 
 object Matrix {
 
-  def apply(contents: Seq[Seq[Number]]): Unit = {
-    require(contents.nonEmpty, "Matrix cannot be empty")
-    require(contents forall (_.nonEmpty), "Matrix cannot have an empty row")
-    require(contents forall (_.length == contents.head.length), "Matrix must have rows of same length")
+  def apply(data: Seq[Seq[Number]]): Matrix = {
+    require(data.nonEmpty, "Matrix cannot be empty")
+    require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
+    require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
 
+    new Matrix(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
 }
