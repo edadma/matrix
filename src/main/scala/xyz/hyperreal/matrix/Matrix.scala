@@ -24,24 +24,34 @@ class Matrix(val rows: Int, val cols: Int, init: (Int, Int) => Number)
 
   def col(c: Int) = new Matrix(rows, 1, (r, _) => apply(r, c))
 
-  def operation(that: Matrix, op: (Int, Int, Matrix, Matrix) => Number): Matrix =
-    new Matrix(rows, cols, op(_, _, this, that))
-
-  def elementWiseOperation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
+  def operation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
-
-    operation(that, (i: Int, j: Int, a: Matrix, b: Matrix) => op(a(i, j), b(i, j)))
+    new Matrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
   }
 
-  def add(that: Matrix): Matrix =
-    elementWiseOperation(that, "Matrix.add", (a: Number, b: Number) => a.doubleValue + b.doubleValue)
+  def add(that: Matrix): Matrix = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
 
   def +(that: Matrix): Matrix = add(that)
 
-  def sub(that: Matrix): Matrix =
-    elementWiseOperation(that, "Matrix.sub", (a: Number, b: Number) => a.doubleValue - b.doubleValue)
+  def sub(that: Matrix): Matrix = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
 
   def -(that: Matrix): Matrix = sub(that)
+
+  def prod(that: Matrix): Number = {
+    require(rows == 1, "Matrix.prod: left operand should be row vector")
+    require(cols == that.rows, "Matrix.prod: width of left operand must equal height of right operand")
+    require(that.cols == 1, "Matrix.prod: right operand should be column vector")
+    this zip that map { case (a, b) => a.doubleValue * b.doubleValue } sum
+  }
+
+  def elemMul(that: Matrix): Matrix = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
+
+  def mul(that: Matrix): Matrix = {
+    require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
+    new Matrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
+  }
+
+  def *(that: Matrix): Matrix = mul(that)
 
   override def toString: String =
     new TextTable() {
@@ -57,8 +67,21 @@ object Matrix {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
-
     new Matrix(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+  }
+
+  def diagonal(size: Int, value: Number) = new Matrix(size, size, (i, j) => if (i == j) value else 0)
+
+  def identity(size: Int): Matrix = diagonal(size, 1)
+
+  def row(elems: Number*): Matrix = {
+    require(elems.nonEmpty, "Matrix.row: need at least one element")
+    Matrix(List(elems))
+  }
+
+  def col(elems: Number*): Matrix = {
+    require(elems.nonEmpty, "Matrix.col: need at least one element")
+    new Matrix(elems.length, 1, (r, _) => elems(r))
   }
 
 }
