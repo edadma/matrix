@@ -10,16 +10,23 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
   val rows: Int
   val cols: Int
 
-  val dim: (Int, Int) = (rows, cols)
-  val length: Int = rows * cols
-  val isRow: Boolean = rows == 1
-  val isCol: Boolean = cols == 1
+  def dim: (Int, Int) = (rows, cols)
+
+  def length: Int = rows * cols
+
+  def isRow: Boolean = rows == 1
+
+  def isCol: Boolean = cols == 1
+
+  def isVector: Boolean = isRow || isCol
+
+  def elements: Seq[(Int, Int, Number)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
+
+  def isZero: Boolean = this forall (_.doubleValue == 0)
+
+  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v.doubleValue == 0 }
 
   def apply(idx: Int): Number = apply(idx / cols + 1, idx % cols + 1)
-
-  def row(r: Int) = new ConcreteMatrix(1, cols, (_, c) => apply(r, c))
-
-  def col(c: Int) = new ConcreteMatrix(rows, 1, (r, _) => apply(r, c))
 
   def concrete = new ConcreteMatrix(rows, cols, apply)
 
@@ -31,25 +38,62 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
 //
 //  def appendRow(m: Matrix): Matrix = Matrix.horiz( this, m)
 
-  def view(ridx: Int, height: Int, cidx: Int, width: Int): Matrix = {
+  def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix = {
     require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
-    require(1 <= cidx && cidx <= rows, s"Matrix.view: col out of range: $cidx")
+    require(1 <= cidx && cidx <= cols, s"Matrix.view: col out of range: $cidx")
     require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
     require(1 <= width && width <= cols, s"Matrix.view: width out of range: $width")
 
     val enclosing = this
 
     new Matrix {
-      val rows: Int = width
-      val cols: Int = height
+      val rows: Int = height
+      val cols: Int = width
 
       def apply(r: Int, c: Int): Number = enclosing(r + ridx - 1, c + cidx - 1)
     }
   }
 
-  def rowView(ridx: Int): Matrix = view(ridx, 1, 1, cols)
+  def row(ridx: Int): Matrix = block(ridx, 1, 1, cols)
 
-  def colView(cidx: Int): Matrix = view(1, rows, cidx, 1)
+  def col(cidx: Int): Matrix = block(1, rows, cidx, 1)
+
+  def operation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
+    require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
+    new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
+  }
+
+  def transpose = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
+
+  def add(that: Matrix): Matrix = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
+
+  def +(that: Matrix): Matrix = add(that)
+
+  def sub(that: Matrix): Matrix = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
+
+  def -(that: Matrix): Matrix = sub(that)
+
+  def prod(that: Matrix): Number = {
+    require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
+    require(length == that.length, "Matrix.prod: operands must be of equal length")
+    this zip that map { case (a, b) => a.doubleValue * b.doubleValue } sum
+  }
+
+  def elemMul(that: Matrix): Matrix = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
+
+  def mul(that: Matrix): Matrix = {
+    require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
+    new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
+  }
+
+  def *(that: Matrix): Matrix = mul(that)
+
+//  def show = {
+//    for (i <- 1 to rows)
+//      println((for (j <- 1 to cols) yield this(i, j)) mkString (" "))
+//
+//    println
+//  }
 
   override def toString: String =
     new TextTable() {
@@ -68,35 +112,6 @@ class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) e
     require(0 < col && col <= cols, s"new Matrix: column out of range: $col")
     data(row - 1)(col - 1)
   }
-
-  def operation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
-    require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
-    new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
-  }
-
-  def add(that: Matrix): Matrix = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
-
-  def +(that: Matrix): Matrix = add(that)
-
-  def sub(that: Matrix): Matrix = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
-
-  def -(that: Matrix): Matrix = sub(that)
-
-  def prod(that: Matrix): Number = {
-    require(rows == 1, "Matrix.prod: left operand should be row vector")
-    require(cols == that.rows, "Matrix.prod: width of left operand must equal height of right operand")
-    require(that.cols == 1, "Matrix.prod: right operand should be column vector")
-    this zip that map { case (a, b) => a.doubleValue * b.doubleValue } sum
-  }
-
-  def elemMul(that: Matrix): Matrix = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
-
-  def mul(that: Matrix): Matrix = {
-    require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
-    new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
-  }
-
-  def *(that: Matrix): Matrix = mul(that)
 
 }
 
