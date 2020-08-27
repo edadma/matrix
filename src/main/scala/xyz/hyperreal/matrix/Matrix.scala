@@ -32,7 +32,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def isVector: Boolean = isRow || isCol
 
-  def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
+  def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, elem(i, j))
 
   lazy val isZero: Boolean = this forall (_ == field.zero)
 
@@ -79,7 +79,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     elem(idx / cols + 1, idx % cols + 1)
   }
 
-//  def concrete = new ConcreteMatrix(rows, cols, apply)
+  def build(init: (Int, Int) => F) = new ConcreteMatrix(rows, cols, init)
+
+  def concrete: ConcreteMatrix[F] = build(elem)
 
   def prependCol(m: Matrix[F]): Matrix[F] = Matrix.cath[F](m, this)
 
@@ -137,12 +139,12 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def operation(that: Matrix[F], name: String, op: (F, F) => F): Matrix[F] = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
-    new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
+    build((i, j) => op(elem(i, j), that(i, j)))
   }
 
-  def transpose = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
+  def transpose: ConcreteMatrix[F] = build((i, j) => elem(j, i))
 
-  def scale(s: F) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j) * s)
+  def scale(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) * s)
 
   def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
