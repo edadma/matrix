@@ -5,7 +5,7 @@ import xyz.hyperreal.table.TextTable
 
 import scala.collection.mutable.ArrayBuffer
 
-abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
+abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] with ((Int, Int) => F) {
 
   val rows: Int
   val cols: Int
@@ -20,25 +20,34 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
 
   def isVector: Boolean = isRow || isCol
 
-  def elements: Seq[(Int, Int, Number)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
+  def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
 
-  def isZero: Boolean = this forall (_.doubleValue == 0)
+  def isZero: Boolean = this forall (field.toDouble(_) == 0)
 
-  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v.doubleValue == 0 }
+  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || field.toDouble(v) == 0 }
 
-  def apply(idx: Int): Number = apply(idx / cols + 1, idx % cols + 1)
+  def isSquare: Boolean = rows == cols
+
+//  def det = {
+//    require(!isSquare, "Matrix.det: must be a square matrix")
+//
+//    if (rows == 2)
+//      this(1, 1)
+//  }
+
+  def apply(idx: Int): F = apply(idx / cols + 1, idx % cols + 1)
 
   def concrete = new ConcreteMatrix(rows, cols, apply)
 
-  def prependCol(m: Matrix): Matrix = Matrix.horiz(m, this)
-
-  def appendCol(m: Matrix): Matrix = Matrix.horiz(this, m)
+//  def prependCol(m: Matrix[F]): Matrix[F] = Matrix.horiz[F](m, this)
+//
+//  def appendCol(m: Matrix[F]): Matrix[F] = Matrix.horiz[F](this, m)
 
 //  def prependRow(m: Matrix): Matrix = Matrix.horiz(m, this)
 //
 //  def appendRow(m: Matrix): Matrix = Matrix.horiz( this, m)
 
-  def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix = {
+  def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
     require(1 <= cidx && cidx <= cols, s"Matrix.view: col out of range: $cidx")
     require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
@@ -50,43 +59,45 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
       val rows: Int = height
       val cols: Int = width
 
-      def apply(r: Int, c: Int): Number = enclosing(r + ridx - 1, c + cidx - 1)
+      def apply(r: Int, c: Int): F = enclosing(r + ridx - 1, c + cidx - 1)
     }
   }
 
-  def row(ridx: Int): Matrix = block(ridx, 1, 1, cols)
+  def row(ridx: Int): Matrix[F] = block(ridx, 1, 1, cols)
 
-  def col(cidx: Int): Matrix = block(1, rows, cidx, 1)
+  def col(cidx: Int): Matrix[F] = block(1, rows, cidx, 1)
 
-  def operation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
+  def operation(that: Matrix[F], name: String, op: (F, F) => F): Matrix[F] = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
     new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
   }
 
   def transpose = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
 
-  def add(that: Matrix): Matrix = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
+  def scale(s: Number) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j).doubleValue * s.doubleValue)
 
-  def +(that: Matrix): Matrix = add(that)
+  def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
 
-  def sub(that: Matrix): Matrix = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
+  def +(that: Matrix[F]): Matrix[F] = add(that)
 
-  def -(that: Matrix): Matrix = sub(that)
+  def sub(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
 
-  def prod(that: Matrix): Number = {
+  def -(that: Matrix[F]): Matrix[F] = sub(that)
+
+  def prod(that: Matrix[F]): Number = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
     require(length == that.length, "Matrix.prod: operands must be of equal length")
     this zip that map { case (a, b) => a.doubleValue * b.doubleValue } sum
   }
 
-  def elemMul(that: Matrix): Matrix = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
+  def elemMul(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
 
-  def mul(that: Matrix): Matrix = {
+  def mul(that: Matrix[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
     new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
   }
 
-  def *(that: Matrix): Matrix = mul(that)
+  def *(that: Matrix[F]): Matrix[F] = mul(that)
 
 //  def show = {
 //    for (i <- 1 to rows)
@@ -103,11 +114,12 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
 
 }
 
-class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) extends Matrix {
+class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit field: Fractional[F])
+    extends Matrix[F] {
 
-  private val data = ArraySeq.tabulate[Number](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
+  private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
-  def apply(row: Int, col: Int): Number = {
+  def apply(row: Int, col: Int): F = {
     require(0 < row && row <= rows, s"new Matrix: row out of range: $row")
     require(0 < col && col <= cols, s"new Matrix: column out of range: $col")
     data(row - 1)(col - 1)
@@ -117,11 +129,11 @@ class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) e
 
 object Matrix {
 
-  def apply(data: Seq[Seq[Number]]): Matrix = {
+  def apply[F](data: Seq[Seq[F]])(implicit field: Fractional[F]): Matrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
-    new ConcreteMatrix(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+    new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
   def diagonal(size: Int, value: Number) = new ConcreteMatrix(size, size, (i, j) => if (i == j) value else 0)
