@@ -1,21 +1,25 @@
 package xyz.hyperreal.matrix
 
-import scala.collection.immutable.{ArraySeq, IndexedSeq}
+import scala.collection.immutable.{IndexedSeq, AbstractSeq, ArraySeq}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+import math.Fractional.Implicits._
 
 import xyz.hyperreal.table.TextTable
 
-abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] with ((Int, Int) => F) {
+abstract class Matrix[F](implicit field: Fractional[F])
+    extends AbstractSeq[F]
+    with IndexedSeq[F]
+    with ((Int, Int) => F) {
 
   val rows: Int
   val cols: Int
 
-  def applyNoCheck(r: Int, c: Int): F
+  def elem(r: Int, c: Int): F
 
-  protected def boundsCheck(r: Int, c: Int): Unit = {
-    require(1 <= r && r <= rows, s"Matrix.apply: row out of range: $r")
-    require(1 <= c && c <= cols, s"Matrix.apply: column out of range: $c")
+  protected def boundsCheck(r: Int, c: Int, name: String): Unit = {
+    require(1 <= r && r <= rows, s"Matrix.$name: row out of range: $r")
+    require(1 <= c && c <= cols, s"Matrix.$name: column out of range: $c")
   }
 
   def dim: (Int, Int) = (rows, cols)
@@ -30,22 +34,46 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 
   def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
 
-  def isZero: Boolean = this forall (field.toDouble(_) == 0)
+  def isZero: Boolean = this forall (_ == field.zero)
 
-  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || field.toDouble(v) == 0 }
+  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v == field.zero }
 
   def isSquare: Boolean = rows == cols
 
-//  def det = {
-//    require(!isSquare, "Matrix.det: must be a square matrix")
-//
-//    if (rows == 2)
-//      this(1, 1)
-//  }
+  def minor(i: Int, j: Int): F = {
+    boundsCheck(i, j, s"minor")
+    withoutRow(i).withoutCol(j).det
+  }
+
+  def cofactor(i: Int, j: Int): F = {
+    boundsCheck(i, j, s"minor")
+    if ((i + j) % 2 == 1) -minor(i, j) else minor(i, j)
+  }
+
+  def det: F = {
+    require(isSquare, "Matrix.det: must be a square matrix")
+
+    rows match {
+      case 1 => elem(1, 1)
+      case 2 => elem(1, 1) * elem(2, 2) - elem(1, 2) * elem(2, 1)
+      case _ => 1 to rows map (i => elem(i, 1) * cofactor(i, 1)) sum
+    }
+  }
+
+  def inv(implicit t: ClassTag[F]): Matrix[F] = {
+    require(isSquare, "Matrix.inv: must be a square matrix")
+
+    Matrix.build(rows, cols, (i, j) => cofactor(j, i)).scale(field.one / det)
+  }
+
+  def apply(r: Int, c: Int): F = {
+    boundsCheck(r, c, "apply")
+    elem(r, c)
+  }
 
   def apply(idx: Int): F = {
     require(0 <= idx && idx < length, s"Matrix (as Seq).apply: index out of range: $idx")
-    apply(idx / cols + 1, idx % cols + 1)
+    elem(idx / cols + 1, idx % cols + 1)
   }
 
 //  def concrete = new ConcreteMatrix(rows, cols, apply)
@@ -70,12 +98,7 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
       val rows: Int = height
       val cols: Int = width
 
-      def applyNoCheck(r: Int, c: Int): F = enclosing.applyNoCheck(r + ridx - 1, c + cidx - 1)
-
-      def apply(r: Int, c: Int): F = {
-        boundsCheck(r, c)
-        applyNoCheck(r, c)
-      }
+      def elem(r: Int, c: Int): F = enclosing.elem(r + ridx - 1, c + cidx - 1)
     }
   }
 
@@ -88,12 +111,20 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
       val rows: Int = enclosing.rows - 1
       val cols: Int = enclosing.cols
 
-      def applyNoCheck(r: Int, c: Int): F = enclosing(if (r >= ridx) r + 1 else r, c)
+      def elem(r: Int, c: Int): F = enclosing(if (r >= ridx) r + 1 else r, c)
+    }
+  }
 
-      def apply(r: Int, c: Int): F = {
-        boundsCheck(r, c)
-        applyNoCheck(r, c)
-      }
+  def withoutCol(cidx: Int): Matrix[F] = {
+    require(1 <= cidx && cidx <= cols, s"Matrix.withoutCol: column out of range: $cidx")
+
+    val enclosing = this
+
+    new Matrix {
+      val rows: Int = enclosing.rows
+      val cols: Int = enclosing.cols - 1
+
+      def elem(r: Int, c: Int): F = enclosing(r, if (c >= cidx) c + 1 else c)
     }
   }
 
@@ -108,23 +139,23 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 
   def transpose(implicit t: ClassTag[F]) = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
 
-  def scale(s: F)(implicit t: ClassTag[F]) = new ConcreteMatrix(rows, cols, (i, j) => field.times(this(i, j), s))
+  def scale(s: F)(implicit t: ClassTag[F]) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j) * s)
 
-  def add(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.add", field.plus)
+  def add(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
   def +(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = add(that)
 
-  def sub(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.sub", field.minus)
+  def sub(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.sub", _ - _)
 
   def -(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = sub(that)
 
   def prod(that: Matrix[F]): F = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
     require(length == that.length, "Matrix.prod: operands must be of equal length")
-    this zip that map { case (a, b) => field.times(a, b) } sum
+    this zip that map { case (a, b) => a * b } sum
   }
 
-  def elemMul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.elemMul", field.times)
+  def elemMul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.elemMul", _ * _)
 
   def mul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
@@ -154,12 +185,7 @@ class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(imp
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
-  def applyNoCheck(row: Int, col: Int): F = data(row - 1)(col - 1)
-
-  def apply(row: Int, col: Int): F = {
-    boundsCheck(row, col)
-    applyNoCheck(row, col)
-  }
+  def elem(row: Int, col: Int): F = data(row - 1)(col - 1)
 
 }
 
@@ -171,6 +197,9 @@ object Matrix {
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
     new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
+
+  def build[F](rows: Int, cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) =
+    new ConcreteMatrix[F](rows, cols, init)
 
   def diagonal[F](size: Int, value: F)(implicit t: ClassTag[F], field: Fractional[F]) =
     new ConcreteMatrix[F](size, size, (i, j) => if (i == j) value else field.zero)
