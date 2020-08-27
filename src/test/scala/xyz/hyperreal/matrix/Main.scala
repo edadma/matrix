@@ -7,6 +7,6 @@ object Main extends App {
 //  val c = Matrix.col(11, 12, 13)
 //  val d = Matrix.row(14, 15, 16)
 
-  println(a * b)
+  println(a.transpose)
 
 }

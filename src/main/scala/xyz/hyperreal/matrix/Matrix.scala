@@ -11,6 +11,13 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
   val rows: Int
   val cols: Int
 
+  def applyNoCheck(r: Int, c: Int): F
+
+  protected def boundsCheck(r: Int, c: Int): Unit = {
+    require(1 <= r && r <= rows, s"Matrix.apply: row out of range: $r")
+    require(1 <= c && c <= cols, s"Matrix.apply: column out of range: $c")
+  }
+
   def dim: (Int, Int) = (rows, cols)
 
   def length: Int = rows * cols
@@ -36,13 +43,16 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 //      this(1, 1)
 //  }
 
-  def apply(idx: Int): F = apply(idx / cols + 1, idx % cols + 1)
+  def apply(idx: Int): F = {
+    require(0 <= idx && idx < length, s"Matrix (as Seq).apply: index out of range: $idx")
+    apply(idx / cols + 1, idx % cols + 1)
+  }
 
 //  def concrete = new ConcreteMatrix(rows, cols, apply)
 
-//  def prependCol(m: Matrix[F]): Matrix[F] = Matrix.horiz[F](m, this)
-//
-//  def appendCol(m: Matrix[F]): Matrix[F] = Matrix.horiz[F](this, m)
+  def prependCol(m: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = Matrix.cath[F](m, this)
+
+  def appendCol(m: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = Matrix.cath[F](this, m)
 
 //  def prependRow(m: Matrix): Matrix = Matrix.horiz(m, this)
 //
@@ -60,7 +70,30 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
       val rows: Int = height
       val cols: Int = width
 
-      def apply(r: Int, c: Int): F = enclosing(r + ridx - 1, c + cidx - 1)
+      def applyNoCheck(r: Int, c: Int): F = enclosing.applyNoCheck(r + ridx - 1, c + cidx - 1)
+
+      def apply(r: Int, c: Int): F = {
+        boundsCheck(r, c)
+        applyNoCheck(r, c)
+      }
+    }
+  }
+
+  def withoutRow(ridx: Int): Matrix[F] = {
+    require(1 <= ridx && ridx <= rows, s"Matrix.withoutRow: row out of range: $ridx")
+
+    val enclosing = this
+
+    new Matrix {
+      val rows: Int = enclosing.rows - 1
+      val cols: Int = enclosing.cols
+
+      def applyNoCheck(r: Int, c: Int): F = enclosing(if (r >= ridx) r + 1 else r, c)
+
+      def apply(r: Int, c: Int): F = {
+        boundsCheck(r, c)
+        applyNoCheck(r, c)
+      }
     }
   }
 
@@ -121,10 +154,11 @@ class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(imp
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
+  def applyNoCheck(row: Int, col: Int): F = data(row - 1)(col - 1)
+
   def apply(row: Int, col: Int): F = {
-    require(0 < row && row <= rows, s"new Matrix: row out of range: $row")
-    require(0 < col && col <= cols, s"new Matrix: column out of range: $col")
-    data(row - 1)(col - 1)
+    boundsCheck(row, col)
+    applyNoCheck(row, col)
   }
 
 }
@@ -153,7 +187,7 @@ object Matrix {
     new ConcreteMatrix(elems.length, 1, (r, _) => elems(r - 1))
   }
 
-  def horiz[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
+  def cath[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(mats.forall(m => m.rows == mat.rows),
             "Matrix.cath: matrices being horizontally concatenated must have same height")
 
@@ -168,6 +202,23 @@ object Matrix {
     }
 
     new ConcreteMatrix(mat.rows, rcols, (i, j) => ms(j - 1)._1(i, ms(j - 1)._2))
+  }
+
+  def catv[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
+    require(mats.forall(m => m.cols == mat.cols),
+            "Matrix.catv: matrices being vertically concatenated must have same width")
+
+    val ms = new ArrayBuffer[(Matrix[F], Int)]
+    var rrows = 0
+
+    for (m <- mat +: mats) {
+      for (i <- 1 to m.rows)
+        ms append ((m, i))
+
+      rrows += m.rows
+    }
+
+    new ConcreteMatrix(rrows, mat.cols, (i, j) => ms(i - 1)._1(ms(i - 1)._2, j))
   }
 
 }
