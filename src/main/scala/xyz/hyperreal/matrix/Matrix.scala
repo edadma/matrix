@@ -10,11 +10,46 @@ abstract class Matrix extends IndexedSeq[Number] with ((Int, Int) => Number) {
   val rows: Int
   val cols: Int
 
-  def length: Int = rows * cols
+  val dim: (Int, Int) = (rows, cols)
+  val length: Int = rows * cols
+  val isRow: Boolean = rows == 1
+  val isCol: Boolean = cols == 1
+
+  def apply(idx: Int): Number = apply(idx / cols + 1, idx % cols + 1)
 
   def row(r: Int) = new ConcreteMatrix(1, cols, (_, c) => apply(r, c))
 
   def col(c: Int) = new ConcreteMatrix(rows, 1, (r, _) => apply(r, c))
+
+  def concrete = new ConcreteMatrix(rows, cols, apply)
+
+  def prependCol(m: Matrix): Matrix = Matrix.horiz(m, this)
+
+  def appendCol(m: Matrix): Matrix = Matrix.horiz(this, m)
+
+//  def prependRow(m: Matrix): Matrix = Matrix.horiz(m, this)
+//
+//  def appendRow(m: Matrix): Matrix = Matrix.horiz( this, m)
+
+  def view(ridx: Int, height: Int, cidx: Int, width: Int): Matrix = {
+    require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
+    require(1 <= cidx && cidx <= rows, s"Matrix.view: col out of range: $cidx")
+    require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
+    require(1 <= width && width <= cols, s"Matrix.view: width out of range: $width")
+
+    val enclosing = this
+
+    new Matrix {
+      val rows: Int = width
+      val cols: Int = height
+
+      def apply(r: Int, c: Int): Number = enclosing(r + ridx - 1, c + cidx - 1)
+    }
+  }
+
+  def rowView(ridx: Int): Matrix = view(ridx, 1, 1, cols)
+
+  def colView(cidx: Int): Matrix = view(1, rows, cidx, 1)
 
   override def toString: String =
     new TextTable() {
@@ -33,25 +68,6 @@ class ConcreteMatrix(val rows: Int, val cols: Int, init: (Int, Int) => Number) e
     require(0 < col && col <= cols, s"new Matrix: column out of range: $col")
     data(row - 1)(col - 1)
   }
-
-  def view(ridx: Int, height: Int, cidx: Int, width: Int): Matrix = {
-    require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
-    require(1 <= cidx && cidx <= rows, s"Matrix.view: col out of range: $cidx")
-    require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
-    require(1 <= width && width <= cols, s"Matrix.view: width out of range: $width")
-    new Matrix {
-      val rows: Int = width
-      val cols: Int = height
-
-      def apply(idx: Int): Number = apply(idx / cols + 1, idx % cols + 1)
-
-      def apply(r: Int, c: Int): Number = ConcreteMatrix.this(r + ridx - 1, c + cidx - 1)
-    }
-  }
-
-  def apply(idx: Int): Number = data(idx / cols)(idx % cols)
-
-  val dim: (Int, Int) = (rows, cols)
 
   def operation(that: Matrix, name: String, op: (Number, Number) => Number): Matrix = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
@@ -107,7 +123,7 @@ object Matrix {
     new ConcreteMatrix(elems.length, 1, (r, _) => elems(r - 1))
   }
 
-  def cath(mat: Matrix, mats: Matrix*): Matrix = {
+  def horiz(mat: Matrix, mats: Matrix*): Matrix = {
     require(mats.forall(m => m.rows == mat.rows),
             "Matrix.cath: matrices being horizontally concatenated must have same height")
 
