@@ -1,9 +1,10 @@
 package xyz.hyperreal.matrix
 
 import scala.collection.immutable.{ArraySeq, IndexedSeq}
-import xyz.hyperreal.table.TextTable
-
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
+
+import xyz.hyperreal.table.TextTable
 
 abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] with ((Int, Int) => F) {
 
@@ -37,7 +38,7 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 
   def apply(idx: Int): F = apply(idx / cols + 1, idx % cols + 1)
 
-  def concrete = new ConcreteMatrix(rows, cols, apply)
+//  def concrete = new ConcreteMatrix(rows, cols, apply)
 
 //  def prependCol(m: Matrix[F]): Matrix[F] = Matrix.horiz[F](m, this)
 //
@@ -67,37 +68,37 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 
   def col(cidx: Int): Matrix[F] = block(1, rows, cidx, 1)
 
-  def operation(that: Matrix[F], name: String, op: (F, F) => F): Matrix[F] = {
+  def operation(that: Matrix[F], name: String, op: (F, F) => F)(implicit t: ClassTag[F]): Matrix[F] = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
     new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
   }
 
-  def transpose = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
+  def transpose(implicit t: ClassTag[F]) = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
 
-  def scale(s: Number) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j).doubleValue * s.doubleValue)
+  def scale(s: F)(implicit t: ClassTag[F]) = new ConcreteMatrix(rows, cols, (i, j) => field.times(this(i, j), s))
 
-  def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _.doubleValue + _.doubleValue)
+  def add(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.add", field.plus)
 
-  def +(that: Matrix[F]): Matrix[F] = add(that)
+  def +(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = add(that)
 
-  def sub(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.sub", _.doubleValue - _.doubleValue)
+  def sub(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.sub", field.minus)
 
-  def -(that: Matrix[F]): Matrix[F] = sub(that)
+  def -(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = sub(that)
 
-  def prod(that: Matrix[F]): Number = {
+  def prod(that: Matrix[F]): F = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
     require(length == that.length, "Matrix.prod: operands must be of equal length")
-    this zip that map { case (a, b) => a.doubleValue * b.doubleValue } sum
+    this zip that map { case (a, b) => field.times(a, b) } sum
   }
 
-  def elemMul(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.elemMul", _.doubleValue * _.doubleValue)
+  def elemMul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.elemMul", field.times)
 
-  def mul(that: Matrix[F]): Matrix[F] = {
+  def mul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
     new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
   }
 
-  def *(that: Matrix[F]): Matrix[F] = mul(that)
+  def *(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = mul(that)
 
 //  def show = {
 //    for (i <- 1 to rows)
@@ -114,7 +115,8 @@ abstract class Matrix[F](implicit field: Fractional[F]) extends IndexedSeq[F] wi
 
 }
 
-class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit field: Fractional[F])
+class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F],
+                                                                             field: Fractional[F])
     extends Matrix[F] {
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
@@ -129,32 +131,33 @@ class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(imp
 
 object Matrix {
 
-  def apply[F](data: Seq[Seq[F]])(implicit field: Fractional[F]): Matrix[F] = {
+  def apply[F](data: Seq[Seq[F]])(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
     new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
-  def diagonal(size: Int, value: Number) = new ConcreteMatrix(size, size, (i, j) => if (i == j) value else 0)
+  def diagonal[F](size: Int, value: F)(implicit t: ClassTag[F], field: Fractional[F]) =
+    new ConcreteMatrix[F](size, size, (i, j) => if (i == j) value else field.zero)
 
-  def identity(size: Int): Matrix = diagonal(size, 1)
+  def identity[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = diagonal(size, field.one)
 
-  def row(elems: Number*): Matrix = {
+  def row[F](elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(elems.nonEmpty, "Matrix.row: need at least one element")
     Matrix(List(elems))
   }
 
-  def col(elems: Number*): Matrix = {
+  def col[F](elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(elems.nonEmpty, "Matrix.col: need at least one element")
     new ConcreteMatrix(elems.length, 1, (r, _) => elems(r - 1))
   }
 
-  def horiz(mat: Matrix, mats: Matrix*): Matrix = {
+  def horiz[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(mats.forall(m => m.rows == mat.rows),
             "Matrix.cath: matrices being horizontally concatenated must have same height")
 
-    val ms = new ArrayBuffer[(Matrix, Int)]
+    val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rcols = 0
 
     for (m <- mat +: mats) {
