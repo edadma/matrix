@@ -7,7 +7,7 @@ import math.Fractional.Implicits._
 
 import xyz.hyperreal.table.TextTable
 
-abstract class Matrix[F](implicit field: Fractional[F])
+abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     extends AbstractSeq[F]
     with IndexedSeq[F]
     with ((Int, Int) => F) {
@@ -24,7 +24,7 @@ abstract class Matrix[F](implicit field: Fractional[F])
 
   def dim: (Int, Int) = (rows, cols)
 
-  def length: Int = rows * cols
+  lazy val length: Int = rows * cols
 
   def isRow: Boolean = rows == 1
 
@@ -34,9 +34,9 @@ abstract class Matrix[F](implicit field: Fractional[F])
 
   def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, this(i, j))
 
-  def isZero: Boolean = this forall (_ == field.zero)
+  lazy val isZero: Boolean = this forall (_ == field.zero)
 
-  def isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v == field.zero }
+  lazy val isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v == field.zero }
 
   def isSquare: Boolean = rows == cols
 
@@ -46,11 +46,11 @@ abstract class Matrix[F](implicit field: Fractional[F])
   }
 
   def cofactor(i: Int, j: Int): F = {
-    boundsCheck(i, j, s"minor")
+    boundsCheck(i, j, s"cofactor")
     if ((i + j) % 2 == 1) -minor(i, j) else minor(i, j)
   }
 
-  def det: F = {
+  lazy val det: F = {
     require(isSquare, "Matrix.det: must be a square matrix")
 
     rows match {
@@ -60,10 +60,13 @@ abstract class Matrix[F](implicit field: Fractional[F])
     }
   }
 
-  def inv(implicit t: ClassTag[F]): Matrix[F] = {
+  lazy val inv: Matrix[F] = {
     require(isSquare, "Matrix.inv: must be a square matrix")
 
-    Matrix.build(rows, cols, (i, j) => cofactor(j, i)).scale(field.one / det)
+    if (rows == 1)
+      Matrix(List(List(field.one / elem(1, 1))))
+    else
+      Matrix.build(rows, cols, (i, j) => cofactor(j, i)).scale(field.one / det)
   }
 
   def apply(r: Int, c: Int): F = {
@@ -78,9 +81,9 @@ abstract class Matrix[F](implicit field: Fractional[F])
 
 //  def concrete = new ConcreteMatrix(rows, cols, apply)
 
-  def prependCol(m: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = Matrix.cath[F](m, this)
+  def prependCol(m: Matrix[F]): Matrix[F] = Matrix.cath[F](m, this)
 
-  def appendCol(m: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = Matrix.cath[F](this, m)
+  def appendCol(m: Matrix[F]): Matrix[F] = Matrix.cath[F](this, m)
 
 //  def prependRow(m: Matrix): Matrix = Matrix.horiz(m, this)
 //
@@ -132,22 +135,22 @@ abstract class Matrix[F](implicit field: Fractional[F])
 
   def col(cidx: Int): Matrix[F] = block(1, rows, cidx, 1)
 
-  def operation(that: Matrix[F], name: String, op: (F, F) => F)(implicit t: ClassTag[F]): Matrix[F] = {
+  def operation(that: Matrix[F], name: String, op: (F, F) => F): Matrix[F] = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
     new ConcreteMatrix(rows, cols, (i, j) => op(this(i, j), that(i, j)))
   }
 
-  def transpose(implicit t: ClassTag[F]) = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
+  def transpose = new ConcreteMatrix(cols, rows, (i, j) => this(j, i))
 
-  def scale(s: F)(implicit t: ClassTag[F]) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j) * s)
+  def scale(s: F) = new ConcreteMatrix(rows, cols, (i, j) => this(i, j) * s)
 
-  def add(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
+  def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
-  def +(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = add(that)
+  def +(that: Matrix[F]): Matrix[F] = add(that)
 
-  def sub(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.sub", _ - _)
+  def sub(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.sub", _ - _)
 
-  def -(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = sub(that)
+  def -(that: Matrix[F]): Matrix[F] = sub(that)
 
   def prod(that: Matrix[F]): F = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
@@ -155,14 +158,14 @@ abstract class Matrix[F](implicit field: Fractional[F])
     this zip that map { case (a, b) => a * b } sum
   }
 
-  def elemMul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = operation(that, "Matrix.elemMul", _ * _)
+  def elemMul(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.elemMul", _ * _)
 
-  def mul(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = {
+  def mul(that: Matrix[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
     new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
   }
 
-  def *(that: Matrix[F])(implicit t: ClassTag[F]): Matrix[F] = mul(that)
+  def *(that: Matrix[F]): Matrix[F] = mul(that)
 
 //  def show = {
 //    for (i <- 1 to rows)
