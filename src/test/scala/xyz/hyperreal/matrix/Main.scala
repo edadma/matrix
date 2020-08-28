@@ -8,7 +8,6 @@ object Main extends App {
 //  val d = Matrix.row(14, 15, 16)
 
   println(a)
-  println(a.inv * a)
-  println(b.inv * b)
+  println(a.vec)
 
 }

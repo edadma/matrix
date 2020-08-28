@@ -32,7 +32,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def isVector: Boolean = isRow || isCol
 
-  def elements: Seq[(Int, Int, F)] = for (i <- 1 to rows; j <- 1 to cols) yield (i, j, elem(i, j))
+  def elements: Seq[(Int, Int, F)] = for (i <- 1 to cols; j <- 1 to rows) yield (i, j, elem(i, j))
 
   lazy val isZero: Boolean = this forall (_ == field.zero)
 
@@ -88,8 +88,10 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def apply(idx: Int): F = {
     require(0 <= idx && idx < length, s"Matrix (as Seq).apply: index out of range: $idx")
-    elem(idx / cols + 1, idx % cols + 1)
+    elem(idx % rows + 1, idx / rows + 1)
   }
+
+  def vec: Matrix[F] = Matrix(map(Seq(_)))
 
   def build(init: (Int, Int) => F) = new ConcreteMatrix(rows, cols, init)
 
