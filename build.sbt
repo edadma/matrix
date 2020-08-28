@@ -55,7 +55,8 @@ libraryDependencies ++= {
 //}
 
 libraryDependencies ++= Seq(
-  "xyz.hyperreal" %% "table" % "0.11.5"
+  "xyz.hyperreal" %% "table" % "0.11.5",
+  "xyz.hyperreal" %% "numbers-jvm" % "0.7.3" % "test"
 )
 
 coverageExcludedPackages := ".*Main"
