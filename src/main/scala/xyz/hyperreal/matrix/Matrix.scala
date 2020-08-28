@@ -10,10 +10,22 @@ import xyz.hyperreal.table.TextTable
 abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     extends AbstractSeq[F]
     with IndexedSeq[F]
-    with ((Int, Int) => F) {
+    with ((Int, Int) => F)
+    with Equals {
 
   val rows: Int
   val cols: Int
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case that: Matrix[F] => (that canEqual this) && (elements forall { case (i, j, v) => v == that.elem(i, j) })
+      case _               => false
+    }
+
+  override def canEqual(other: Any): Boolean =
+    other.isInstanceOf[Matrix[F]]
+
+  override def hashCode: Int = map(_.hashCode) reduce (_ ^ _)
 
   def elem(r: Int, c: Int): F
 
@@ -22,23 +34,23 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(1 <= c && c <= cols, s"Matrix.$name: column out of range: $c")
   }
 
-  def dim: (Int, Int) = (rows, cols)
+  lazy val dim: (Int, Int) = (rows, cols)
 
   lazy val length: Int = rows * cols
 
-  def isRow: Boolean = rows == 1
+  lazy val isRow: Boolean = rows == 1
 
-  def isCol: Boolean = cols == 1
+  lazy val isCol: Boolean = cols == 1
 
-  def isVector: Boolean = isRow || isCol
+  lazy val isVector: Boolean = isRow || isCol
 
-  def elements: Seq[(Int, Int, F)] = for (i <- 1 to cols; j <- 1 to rows) yield (i, j, elem(i, j))
+  lazy val elements: Seq[(Int, Int, F)] = for (i <- 1 to cols; j <- 1 to rows) yield (i, j, elem(i, j))
 
   lazy val isZero: Boolean = this forall (_ == field.zero)
 
   lazy val isDiagonal: Boolean = elements forall { case (i, j, v) => i == j || v == field.zero }
 
-  def isSquare: Boolean = rows == cols
+  lazy val isSquare: Boolean = rows == cols
 
   def minor(i: Int, j: Int): F = {
     boundsCheck(i, j, s"minor")
