@@ -63,10 +63,22 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   lazy val inv: Matrix[F] = {
     require(isSquare, "Matrix.inv: must be a square matrix")
 
-    if (rows == 1)
-      Matrix(List(List(field.one / elem(1, 1))))
-    else
-      Matrix.build(rows, cols, (i, j) => cofactor(j, i)).scale(field.one / det)
+    rows match {
+      case 1 => Matrix(List(List(field.one / elem(1, 1))))
+      case _ => adj / det
+    }
+
+  }
+
+  lazy val adj: Matrix[F] = {
+    require(isSquare, "Matrix.adj: must be a square matrix")
+
+    rows match {
+      case 1 if elem(1, 1) == field.zero => this
+      case 1                             => Matrix(Seq(Seq(field.one)))
+      case 2                             => Matrix(Seq(Seq(elem(2, 2), -elem(1, 2)), Seq(-elem(2, 1), elem(1, 1))))
+      case _                             => Matrix.build(rows, cols, (i, j) => cofactor(j, i))
+    }
   }
 
   def apply(r: Int, c: Int): F = {
@@ -144,7 +156,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def transpose: ConcreteMatrix[F] = build((i, j) => elem(j, i))
 
-  def scale(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) * s)
+  def *(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) * s)
+
+  def /(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) / s)
 
   def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
