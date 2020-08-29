@@ -40,9 +40,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isRow: Boolean = rows == 1
 
-  lazy val isCol: Boolean = cols == 1
+  lazy val isColumn: Boolean = cols == 1
 
-  lazy val isVector: Boolean = isRow || isCol
+  lazy val isVector: Boolean = isRow || isColumn
 
   lazy val elements: Seq[(Int, Int, F)] = for (i <- 1 to cols; j <- 1 to rows) yield (i, j, elem(i, j))
 
@@ -132,13 +132,23 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def concrete: ConcreteMatrix[F] = build(elem)
 
-  def prependCol(m: Matrix[F]): Matrix[F] = Matrix.cath[F](m, this)
+  def prepend(v: Matrix[F]): Matrix[F] = {
+    require(v.isVector, "can only prepend a row or column vector")
 
-  def appendCol(m: Matrix[F]): Matrix[F] = Matrix.cath[F](this, m)
+    if (v.isColumn)
+      Matrix.cath(v, this)
+    else
+      Matrix.catv(v, this)
+  }
 
-//  def prependRow(m: Matrix): Matrix = Matrix.horiz(m, this)
-//
-//  def appendRow(m: Matrix): Matrix = Matrix.horiz( this, m)
+  def append(v: Matrix[F]): Matrix[F] = {
+    require(v.isVector, "can only append a row or column vector")
+
+    if (v.isColumn)
+      Matrix.cath(this, v)
+    else
+      Matrix.catv(this, v)
+  }
 
   def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
