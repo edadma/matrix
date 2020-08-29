@@ -52,6 +52,12 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isSquare: Boolean = rows == cols
 
+  lazy val isSymmetric: Boolean = isSquare && this == transpose
+
+  lazy val isSkewSymmetric: Boolean = isSquare && elements.forall { case (i, j, v) => v == -elem(j, i) }
+
+  lazy val isOrthogonal: Boolean = isSquare && transpose == inv
+
   def minor(i: Int, j: Int): F = {
     boundsCheck(i, j, s"minor")
     withoutRow(i).withoutCol(j).det
@@ -60,6 +66,12 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   def cofactor(i: Int, j: Int): F = {
     boundsCheck(i, j, s"cofactor")
     if ((i + j) % 2 == 1) -minor(i, j) else minor(i, j)
+  }
+
+  lazy val tr: F = {
+    require(isSquare, "Matrix.tr: must be a square matrix")
+
+    1 to rows map (i => elem(i, i)) sum
   }
 
   lazy val det: F = {
@@ -89,7 +101,18 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       case 1 if elem(1, 1) == field.zero => this
       case 1                             => Matrix(Seq(Seq(field.one)))
       case 2                             => Matrix(Seq(Seq(elem(2, 2), -elem(1, 2)), Seq(-elem(2, 1), elem(1, 1))))
-      case _                             => Matrix.build(rows, cols, (i, j) => cofactor(j, i))
+      case _                             => build((i, j) => cofactor(j, i))
+    }
+  }
+
+  lazy val transpose: Matrix[F] = {
+    val outer = this
+
+    new Matrix {
+      val rows: Int = outer.rows
+      val cols: Int = outer.cols
+
+      def elem(i: Int, j: Int): F = outer.elem(j, i)
     }
   }
 
@@ -123,39 +146,39 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
     require(1 <= width && width <= cols, s"Matrix.view: width out of range: $width")
 
-    val enclosing = this
+    val outer = this
 
     new Matrix {
       val rows: Int = height
       val cols: Int = width
 
-      def elem(r: Int, c: Int): F = enclosing.elem(r + ridx - 1, c + cidx - 1)
+      def elem(r: Int, c: Int): F = outer.elem(r + ridx - 1, c + cidx - 1)
     }
   }
 
   def withoutRow(ridx: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.withoutRow: row out of range: $ridx")
 
-    val enclosing = this
+    val outer = this
 
     new Matrix {
-      val rows: Int = enclosing.rows - 1
-      val cols: Int = enclosing.cols
+      val rows: Int = outer.rows - 1
+      val cols: Int = outer.cols
 
-      def elem(r: Int, c: Int): F = enclosing(if (r >= ridx) r + 1 else r, c)
+      def elem(r: Int, c: Int): F = outer.elem(if (r >= ridx) r + 1 else r, c)
     }
   }
 
   def withoutCol(cidx: Int): Matrix[F] = {
     require(1 <= cidx && cidx <= cols, s"Matrix.withoutCol: column out of range: $cidx")
 
-    val enclosing = this
+    val outer = this
 
     new Matrix {
-      val rows: Int = enclosing.rows
-      val cols: Int = enclosing.cols - 1
+      val rows: Int = outer.rows
+      val cols: Int = outer.cols - 1
 
-      def elem(r: Int, c: Int): F = enclosing(r, if (c >= cidx) c + 1 else c)
+      def elem(r: Int, c: Int): F = outer.elem(r, if (c >= cidx) c + 1 else c)
     }
   }
 
@@ -167,8 +190,6 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
     build((i, j) => op(elem(i, j), that(i, j)))
   }
-
-  def transpose: ConcreteMatrix[F] = build((i, j) => elem(j, i))
 
   def *(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) * s)
 
