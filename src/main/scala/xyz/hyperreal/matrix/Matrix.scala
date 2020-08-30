@@ -58,9 +58,14 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isOrthogonal: Boolean = isSquare && transpose == inv
 
+  def submatrix(i: Int, j: Int): Matrix[F] = {
+    boundsCheck(i, j, s"submatrix")
+    removeRow(i).removeCol(j)
+  }
+
   def minor(i: Int, j: Int): F = {
     boundsCheck(i, j, s"minor")
-    withoutRow(i).withoutCol(j).det
+    submatrix(i, j).det
   }
 
   def cofactor(i: Int, j: Int): F = {
@@ -70,7 +75,6 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val tr: F = {
     require(isSquare, "Matrix.tr: must be a square matrix")
-
     1 to rows map (i => elem(i, i)) sum
   }
 
@@ -150,6 +154,28 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       Matrix.catv(this, v)
   }
 
+  def replace( v: Matrix[F], idx: Int ): Matrix[F] = {
+    require(v.isVector, "can only replace a row or column vector")
+
+    if (v.isColumn) {
+      require(1 <= idx && idx <= cols, s"column index out of range: $idx")
+
+      idx match {
+        case 1 => Matrix.cath(v, removeCol(1))
+        case `cols` => Matrix.cath(removeCol(cols), v)
+        case _ => Matrix.cath(block(1, rows, 1, idx - 1), v, block(1, rows, idx + 1, cols - idx))
+      }
+    } else {
+      require(1 <= idx && idx <= rows, s"row index out of range: $idx")
+
+      idx match {
+        case 1 => Matrix.catv(v, removeRow(1))
+        case `rows` => Matrix.catv(removeRow(cols), v)
+        case _ => Matrix.catv(block(1, idx - 1, 1, cols), v, block( idx + 1, rows - idx, 1, cols))
+      }
+    }
+  }
+
   def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
     require(1 <= cidx && cidx <= cols, s"Matrix.view: col out of range: $cidx")
@@ -166,8 +192,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  def withoutRow(ridx: Int): Matrix[F] = {
-    require(1 <= ridx && ridx <= rows, s"Matrix.withoutRow: row out of range: $ridx")
+  def removeRow(ridx: Int): Matrix[F] = {
+    require(1 <= ridx && ridx <= rows, s"Matrix.removeRow: row out of range: $ridx")
 
     val outer = this
 
@@ -179,8 +205,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  def withoutCol(cidx: Int): Matrix[F] = {
-    require(1 <= cidx && cidx <= cols, s"Matrix.withoutCol: column out of range: $cidx")
+  def removeCol(cidx: Int): Matrix[F] = {
+    require(1 <= cidx && cidx <= cols, s"Matrix.removeCol: column out of range: $cidx")
 
     val outer = this
 

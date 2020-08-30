@@ -12,5 +12,5 @@ object Main extends App {
 //  println(a.inv * b)
 
   println(a)
-  println(a append Matrix.col[Rational](7, 8, 9))
+  println(a.replace(Matrix.row[Rational](7, 8, 9), 1))
 }
