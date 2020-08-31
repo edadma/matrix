@@ -130,7 +130,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     elem(idx % rows + 1, idx / rows + 1)
   }
 
-  def vec: Matrix[F] = Matrix(map(Seq(_)))
+  lazy val vec: Matrix[F] = Matrix(map(Seq(_)))
 
   def build(init: (Int, Int) => F) = new ConcreteMatrix(rows, cols, init)
 
@@ -154,24 +154,24 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       Matrix.catv(this, v)
   }
 
-  def replace( v: Matrix[F], idx: Int ): Matrix[F] = {
+  def replace(v: Matrix[F], idx: Int): Matrix[F] = {
     require(v.isVector, "can only replace a row or column vector")
 
     if (v.isColumn) {
       require(1 <= idx && idx <= cols, s"column index out of range: $idx")
 
       idx match {
-        case 1 => Matrix.cath(v, removeCol(1))
+        case 1      => Matrix.cath(v, removeCol(1))
         case `cols` => Matrix.cath(removeCol(cols), v)
-        case _ => Matrix.cath(block(1, rows, 1, idx - 1), v, block(1, rows, idx + 1, cols - idx))
+        case _      => Matrix.cath(block(1, rows, 1, idx - 1), v, block(1, rows, idx + 1, cols - idx))
       }
     } else {
       require(1 <= idx && idx <= rows, s"row index out of range: $idx")
 
       idx match {
-        case 1 => Matrix.catv(v, removeRow(1))
+        case 1      => Matrix.catv(v, removeRow(1))
         case `rows` => Matrix.catv(removeRow(cols), v)
-        case _ => Matrix.catv(block(1, idx - 1, 1, cols), v, block( idx + 1, rows - idx, 1, cols))
+        case _      => Matrix.catv(block(1, idx - 1, 1, cols), v, block(idx + 1, rows - idx, 1, cols))
       }
     }
   }
