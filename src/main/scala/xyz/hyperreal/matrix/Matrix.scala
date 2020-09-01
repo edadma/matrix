@@ -134,7 +134,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def build(init: (Int, Int) => F) = new ConcreteMatrix(rows, cols, init)
 
-  def concrete: ConcreteMatrix[F] = build(elem)
+  def concrete: Matrix[F] = build(elem)
 
   def prepend(v: Matrix[F]): Matrix[F] = {
     require(v.isVector, "can only prepend a row or column vector")
@@ -227,9 +227,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     build((i, j) => op(elem(i, j), that(i, j)))
   }
 
-  def *(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) * s)
+  def map(f: F => F): Matrix[F] = build((i, j) => f(elem(i, j)))
 
-  def /(s: F): ConcreteMatrix[F] = build((i, j) => elem(i, j) / s)
+  def *(s: F): Matrix[F] = build((i, j) => elem(i, j) * s)
+
+  def /(s: F): Matrix[F] = build((i, j) => elem(i, j) / s)
 
   def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
@@ -286,6 +288,18 @@ object Matrix {
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
     new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+  }
+
+  def fromRows[F](cols: Int, elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+    require(elems.nonEmpty, "matrix cannot be empty")
+    require(elems.length % cols == 0, "wrong number of elements")
+    build(elems.length / cols, cols, (i, j) => elems((i - 1) * cols + j - 1))
+  }
+
+  def fromSeq[F](rows: Int, elems: Seq[F])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+    require(elems.nonEmpty, "matrix cannot be empty")
+    require(elems.length % rows == 0, "wrong number of elements")
+    build(rows, elems.length / rows, (i, j) => elems(i - 1 + (j - 1) * rows))
   }
 
   def build[F](rows: Int, cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) =
