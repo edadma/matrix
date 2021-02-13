@@ -20,5 +20,6 @@ object Main extends App {
   println(a.rowEchelonForm)
   println(a.reducedRowEchelonForm)
   println(a.rank)
+  println(a.solution)
 
 }

@@ -269,7 +269,17 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   lazy val rank: Int = {
     val a = echelon(false)
 
+    nonZeroDiagonals(a)
+  }
+
+  protected def nonZeroDiagonals(a: Array[Array[F]]): Int =
     (0 until (rows min cols)).iterator map (i => a(i)(i)) count (_ == field.one)
+
+  lazy val solution: ConcreteMatrix[F] = {
+    val a = echelon(true)
+    val r = nonZeroDiagonals(a)
+
+    Matrix.fromSeq(r, 0 until r map (a(_)(cols - 1)))
   }
 
   protected def echelon(reduced: Boolean): Array[Array[F]] = {
