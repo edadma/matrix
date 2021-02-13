@@ -267,6 +267,23 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 //    println
 //  }
 
+  lazy val rref = {
+    val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i, j))
+
+    def swap(a: Int, b: Int): Unit =
+      for (i <- 0 until cols) {
+        val t = array(a)(i)
+
+        array(a)(i) = array(b)(i)
+        array(b)(i) = t
+      }
+
+    for (i <- 0 until cols; j <- 0 until rows)
+      array(i)(j) = elem(i, j)
+
+    Matrix.build(rows, cols, (i: Int, j: Int) => array(i)(j))
+  }
+
   override def toString: String =
     new TextTable() {
       for (i <- 1 to rows)
