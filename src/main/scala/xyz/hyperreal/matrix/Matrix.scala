@@ -267,19 +267,46 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 //    println
 //  }
 
-  lazy val rref = {
+  def echelon(reduced: Boolean): ConcreteMatrix[F] = {
     val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i, j))
 
-    def swap(a: Int, b: Int): Unit =
+    def swap(r1: Int, r2: Int): Unit =
       for (i <- 0 until cols) {
-        val t = array(a)(i)
+        val t = array(r1)(i)
 
-        array(a)(i) = array(b)(i)
-        array(b)(i) = t
+        array(r1)(i) = array(r2)(i)
+        array(r2)(i) = t
       }
+
+    def one(r: Int): Unit = {
+      val pivot = array(r)(r)
+
+      if (pivot != field.one) {
+        val s = field.one / pivot
+
+        for (i <- 0 until cols)
+          array(r)(i) *= s
+      }
+    }
+
+    def zero(rt: Int, c: Int, rs: Int): Unit = {
+      val s = array(rt)(c)
+
+      for (i <- c until cols)
+        array(rt)(i) -= s * array(rs)(i)
+    }
 
     for (i <- 0 until cols; j <- 0 until rows)
       array(i)(j) = elem(i, j)
+
+    for (j <- 0 until (rows min cols)) {
+      if (array(j)(j) == field.zero) {}
+
+      one(j)
+
+      if (reduced) {}
+
+    }
 
     Matrix.build(rows, cols, (i: Int, j: Int) => array(i)(j))
   }
