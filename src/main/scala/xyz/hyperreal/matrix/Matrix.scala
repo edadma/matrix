@@ -27,7 +27,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   override def hashCode: Int = map(_.hashCode) reduce (_ ^ _)
 
-  def elem(r: Int, c: Int): F
+  protected def elem(r: Int, c: Int): F
 
   protected def boundsCheck(r: Int, c: Int, name: String): Unit = {
     require(1 <= r && r <= rows, s"Matrix.$name: row out of range: $r")
@@ -268,7 +268,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 //  }
 
   def echelon(reduced: Boolean): ConcreteMatrix[F] = {
-    val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i, j))
+    val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i + 1, j + 1))
 
     def swap(r1: Int, r2: Int): Unit =
       for (i <- 0 until cols) {
@@ -282,33 +282,51 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       val pivot = array(r)(r)
 
       if (pivot != field.one) {
-        val s = field.one / pivot
 
-        for (i <- 0 until cols)
-          array(r)(i) *= s
+        println(s"r${r + 1}/$pivot")
+
+        for (i <- r until cols) {
+          array(r)(i) /= pivot
+        }
       }
     }
 
-    def zero(rt: Int, c: Int, rs: Int): Unit = {
-      val s = array(rt)(c)
+    def zero(rs: Int, rt: Int): Unit = {
+      val s = array(rt)(rs)
 
-      for (i <- c until cols)
-        array(rt)(i) -= s * array(rs)(i)
+      if (s != field.zero) {
+        array(rt)(rs) = field.zero
+        print(s"r${rt + 1} -= $s * r${rs + 1} --> 0 ")
+
+        for (i <- rs + 1 until cols) {
+          array(rt)(i) -= s * array(rs)(i)
+          print(s"${array(rt)(i)} ")
+        }
+
+        println
+      }
     }
 
-    for (i <- 0 until cols; j <- 0 until rows)
-      array(i)(j) = elem(i, j)
+    for (i <- 0 until (rows min cols)) {
+      if (array(i)(i) == field.zero) {
+        (0 until rows filter (_ != i)).find(r => array(r)(i) != field.zero) match {
+          case Some(row) => swap(row, i)
+          case None      =>
+        }
+      }
 
-    for (j <- 0 until (rows min cols)) {
-      if (array(j)(j) == field.zero) {}
+      if (array(i)(i) != field.zero) {
+        one(i)
 
-      one(j)
-
-      if (reduced) {}
-
+        for (j <- (0 until (if (reduced) i else 0)) ++ (i + 1 until rows))
+          zero(i, j)
+      }
     }
 
-    Matrix.build(rows, cols, (i: Int, j: Int) => array(i)(j))
+    for (i <- 0 until rows)
+      println((for (j <- 0 until cols) yield array(i)(j)) mkString " ")
+
+    Matrix.build(rows, cols, (i: Int, j: Int) => array(i - 1)(j - 1))
   }
 
   override def toString: String =
