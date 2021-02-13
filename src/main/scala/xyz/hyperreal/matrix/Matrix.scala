@@ -22,8 +22,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       case _               => false
     }
 
-  override def canEqual(other: Any): Boolean =
-    other.isInstanceOf[Matrix[F]]
+  override def canEqual(other: Any): Boolean = other.isInstanceOf[Matrix[F]]
 
   override def hashCode: Int = map(_.hashCode) reduce (_ ^ _)
 
@@ -266,11 +265,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val reducedRowEchelonForm: ConcreteMatrix[F] = Matrix.fromArray(echelon(true))
 
-  lazy val rank: Int = {
-    val a = echelon(false)
-
-    nonZeroDiagonals(a)
-  }
+  lazy val rank: Int = nonZeroDiagonals(echelon(false))
 
   protected def nonZeroDiagonals(a: Array[Array[F]]): Int =
     (0 until (rows min cols)).iterator map (i => a(i)(i)) count (_ == field.one)
@@ -297,7 +292,6 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       val pivot = array(r)(r)
 
       if (pivot != field.one) {
-
         println(s"r${r + 1}/$pivot")
 
         for (i <- r until cols) {
