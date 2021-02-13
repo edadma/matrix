@@ -63,6 +63,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isOrthogonal: Boolean = isSquare && transpose == inv
 
+  lazy val diagonal: Iterator[F] = (1 to (rows min cols)).iterator map (i => elem(i, i))
+
   def submatrix(i: Int, j: Int): Matrix[F] = {
     boundsCheck(i, j, s"submatrix")
     removeRow(i).removeCol(j)
@@ -260,14 +262,17 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def *(that: Matrix[F]): Matrix[F] = mul(that)
 
-//  def show = {
-//    for (i <- 1 to rows)
-//      println((for (j <- 1 to cols) yield this(i, j)) mkString (" "))
-//
-//    println
-//  }
+  lazy val rowEchelonForm: ConcreteMatrix[F] = Matrix.fromArray(echelon(false))
 
-  def echelon(reduced: Boolean): ConcreteMatrix[F] = {
+  lazy val reducedRowEchelonForm: ConcreteMatrix[F] = Matrix.fromArray(echelon(true))
+
+  lazy val rank: Int = {
+    val a = echelon(false)
+
+    (0 until (rows min cols)).iterator map (i => a(i)(i)) count (_ == field.one)
+  }
+
+  protected def echelon(reduced: Boolean): Array[Array[F]] = {
     val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i + 1, j + 1))
 
     def swap(r1: Int, r2: Int): Unit =
@@ -296,22 +301,24 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
       if (s != field.zero) {
         array(rt)(rs) = field.zero
-        print(s"r${rt + 1} -= $s * r${rs + 1} --> 0 ")
+//        print(s"r${rt + 1} -= $s * r${rs + 1} --> 0 ")
 
         for (i <- rs + 1 until cols) {
           array(rt)(i) -= s * array(rs)(i)
-          print(s"${array(rt)(i)} ")
+//          print(s"${array(rt)(i)} ")
         }
 
-        println
+//        println
       }
     }
 
     for (i <- 0 until (rows min cols)) {
       if (array(i)(i) == field.zero) {
-        (0 until rows filter (_ != i)).find(r => array(r)(i) != field.zero) match {
-          case Some(row) => swap(row, i)
-          case None      =>
+        (i until rows filter (_ != i)).find(r => array(r)(i) != field.zero) match {
+          case Some(row) =>
+//            println(s"r${row + 1} <-> r${i + 1}")
+            swap(row, i)
+          case None =>
         }
       }
 
@@ -323,10 +330,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       }
     }
 
-    for (i <- 0 until rows)
-      println((for (j <- 0 until cols) yield array(i)(j)) mkString " ")
-
-    Matrix.build(rows, cols, (i: Int, j: Int) => array(i - 1)(j - 1))
+    array
   }
 
   override def toString: String =
@@ -366,6 +370,13 @@ object Matrix {
     require(elems.nonEmpty, "matrix cannot be empty")
     require(elems.length % rows == 0, "wrong number of elements")
     build(rows, elems.length / rows, (i, j) => elems(i - 1 + (j - 1) * rows))
+  }
+
+  def fromArray[F](data: Array[Array[F]])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+    require(data.nonEmpty, "Matrix cannot be empty")
+    require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
+    require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
+    new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
   def build[F](rows: Int, cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) =

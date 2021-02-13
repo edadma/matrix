@@ -17,7 +17,8 @@ object Main extends App {
   val a = Matrix[Number](List(List(1, 2, 1), List(-2, -3, 1), List(3, 5, 0)))
 
   println(a)
-  println(a.echelon(false))
-//  println(a.echelon(true))
+  println(a.rowEchelonForm)
+  println(a.reducedRowEchelonForm)
+  println(a.rank)
 
 }
