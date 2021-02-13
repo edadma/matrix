@@ -44,7 +44,12 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isVector: Boolean = isRow || isColumn
 
-  lazy val elements: Seq[(Int, Int, F)] = for (i <- 1 to cols; j <- 1 to rows) yield (i, j, elem(i, j))
+  def elements: Iterator[(Int, Int, F)] =
+    0 until length map { idx =>
+      val (r, c) = (idx % rows + 1, idx / rows + 1)
+
+      (r, c, elem(r, c))
+    } iterator
 
   lazy val isZero: Boolean = this forall (_ == field.zero)
 
@@ -95,7 +100,6 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       case 1 => Matrix(List(List(field.one / elem(1, 1))))
       case _ => adj / det
     }
-
   }
 
   lazy val adj: Matrix[F] = {
