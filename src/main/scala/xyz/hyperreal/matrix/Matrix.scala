@@ -60,7 +60,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val isSkewSymmetric: Boolean = isSquare && elements.forall { case (i, j, v) => v == -elem(j, i) }
 
-  lazy val isOrthogonal: Boolean = isSquare && transpose == inv
+  lazy val isOrthogonal: Boolean = isSquare && transpose == inverse
+
+  lazy val upperTriangular: Boolean = elements forall { case (i, j, v) => i <= j || v == field.zero }
+
+  lazy val lowerTriangular: Boolean = elements forall { case (i, j, v) => i >= j || v == field.zero }
 
   lazy val diagonal: Iterator[F] = (1 to (rows min cols)).iterator map (i => elem(i, i))
 
@@ -79,7 +83,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     if ((i + j) % 2 == 1) -minor(i, j) else minor(i, j)
   }
 
-  lazy val tr: F = {
+  lazy val trace: F = {
     require(isSquare, "Matrix.tr: must be a square matrix")
     1 to rows map (i => elem(i, i)) sum
   }
@@ -94,7 +98,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  lazy val inv: Matrix[F] = {
+  lazy val inverse: Matrix[F] = {
     require(isSquare, "Matrix.inv: must be a square matrix")
 
     rows match {
@@ -338,9 +342,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   }
 
   override def toString: String =
-    new TextTable() {
+    new TextTable(matrix = true) {
       for (i <- 1 to rows)
         rowSeq(Matrix.this.row(i))
+
+      1 to cols foreach rightAlignment
     }.toString
 
 }
@@ -388,6 +394,9 @@ object Matrix {
 
   def diagonal[F](size: Int, value: F)(implicit t: ClassTag[F], field: Fractional[F]) =
     new ConcreteMatrix[F](size, size, (i, j) => if (i == j) value else field.zero)
+
+  def zero[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]) =
+    new ConcreteMatrix[F](size, size, (_, _) => field.zero)
 
   def identity[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = diagonal(size, field.one)
 

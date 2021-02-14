@@ -55,7 +55,7 @@ libraryDependencies ++= {
 //}
 
 libraryDependencies ++= Seq(
-  "xyz.hyperreal" %% "table" % "0.11.5",
+  "xyz.hyperreal" %% "table" % "1.0.0-snapshot.1",
   "xyz.hyperreal" %% "dal-jvm" % "0.1.18" % "test"
 )
 
