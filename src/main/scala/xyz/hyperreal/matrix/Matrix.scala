@@ -102,7 +102,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(isSquare, "Matrix.inv: must be a square matrix")
 
     rows match {
-      case 1 => Matrix(List(List(field.one / elem(1, 1))))
+      case 1 => Matrix.row(field.one / elem(1, 1))
       case _ => adj / det
     }
   }
@@ -112,8 +112,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
     rows match {
       case 1 if elem(1, 1) == field.zero => this
-      case 1                             => Matrix(Seq(Seq(field.one)))
-      case 2                             => Matrix(Seq(Seq(elem(2, 2), -elem(1, 2)), Seq(-elem(2, 1), elem(1, 1))))
+      case 1                             => Matrix.row(field.one)
+      case 2                             => Matrix.rows(2, elem(2, 2), -elem(1, 2), -elem(2, 1), elem(1, 1))
       case _                             => build((i, j) => cofactor(j, i))
     }
   }
@@ -278,7 +278,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     val a = echelon(true)
     val r = nonZeroDiagonals(a)
 
-    Matrix.fromSeq(r, 0 until r map (a(_)(cols - 1)))
+    Matrix.fromIndexedSeq(1, 0 until r map (a(_)(cols - 1)))
   }
 
   protected def echelon(reduced: Boolean): Array[Array[F]] = {
@@ -367,26 +367,27 @@ object Matrix {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
-    new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+    build(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
-  def fromRows[F](cols: Int, elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+  def rows[F](width: Int, elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
-    require(elems.length % cols == 0, "wrong number of elements")
-    build(elems.length / cols, cols, (i, j) => elems((i - 1) * cols + j - 1))
+    require(elems.length % width == 0, "wrong number of elements")
+    build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
-  def fromSeq[F](rows: Int, elems: Seq[F])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+  def fromIndexedSeq[F](width: Int, elems: IndexedSeq[F])(implicit t: ClassTag[F],
+                                                          field: Fractional[F]): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
-    require(elems.length % rows == 0, "wrong number of elements")
-    build(rows, elems.length / rows, (i, j) => elems(i - 1 + (j - 1) * rows))
+    require(elems.length % width == 0, "wrong number of elements")
+    build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
   def fromArray[F](data: Array[Array[F]])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
     require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
-    new ConcreteMatrix[F](data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+    build(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
   }
 
   def build[F](rows: Int, cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) =
@@ -402,12 +403,12 @@ object Matrix {
 
   def row[F](elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(elems.nonEmpty, "Matrix.row: need at least one element")
-    Matrix(List(elems))
+    build(1, elems.length, (_, c) => elems(c - 1))
   }
 
   def col[F](elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(elems.nonEmpty, "Matrix.col: need at least one element")
-    new ConcreteMatrix(elems.length, 1, (r, _) => elems(r - 1))
+    build(elems.length, 1, (r, _) => elems(r - 1))
   }
 
   def cath[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
@@ -424,7 +425,7 @@ object Matrix {
       rcols += m.cols
     }
 
-    new ConcreteMatrix(mat.rows, rcols, (i, j) => ms(j - 1)._1(i, ms(j - 1)._2))
+    build(mat.rows, rcols, (i, j) => ms(j - 1)._1(i, ms(j - 1)._2))
   }
 
   def catv[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
@@ -441,7 +442,7 @@ object Matrix {
       rrows += m.rows
     }
 
-    new ConcreteMatrix(rrows, mat.cols, (i, j) => ms(i - 1)._1(ms(i - 1)._2, j))
+    build(rrows, mat.cols, (i, j) => ms(i - 1)._1(ms(i - 1)._2, j))
   }
 
 }
