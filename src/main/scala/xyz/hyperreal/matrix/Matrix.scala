@@ -4,6 +4,7 @@ import scala.collection.immutable.{IndexedSeq, AbstractSeq, ArraySeq}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import math.Fractional.Implicits._
+import math.Ordering.Implicits._
 
 import xyz.hyperreal.table.TextTable
 
@@ -238,9 +239,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def map(f: F => F): Matrix[F] = build((i, j) => f(elem(i, j)))
 
-  def *(s: F): Matrix[F] = build((i, j) => elem(i, j) * s)
+  def *(s: F): Matrix[F] = map(_ * s)
 
-  def /(s: F): Matrix[F] = build((i, j) => elem(i, j) / s)
+  def /(s: F): Matrix[F] = map(_ / s)
 
   def add(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.add", _ + _)
 
@@ -281,38 +282,106 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     Matrix.fromIndexedSeq(1, 0 until r map (a(_)(cols - 1)))
   }
 
-  protected def echelon(reduced: Boolean): Array[Array[F]] = {
-    val array = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i + 1, j + 1))
+  def array: Array[Array[F]] = Array.tabulate[F](rows, cols)((i: Int, j: Int) => elem(i + 1, j + 1))
 
-    def swap(r1: Int, r2: Int): Unit =
-      for (i <- 0 until cols) {
-        val t = array(r1)(i)
+  lazy val LU: (ConcreteMatrix[F], ConcreteMatrix[F]) = {
+    val a = array
+    val l = Array.fill[F](rows, cols)(field.zero)
+    val u = Array.fill[F](rows, cols)(field.zero)
 
-        array(r1)(i) = array(r2)(i)
-        array(r2)(i) = t
+    for (k <- 0 until rows) {
+      u(k)(k) = a(k)(k)
+
+      for (i <- k + 1 until rows) {
+        l(i)(k) = a(i)(k) / u(k)(k)
+        u(k)(i) = a(k)(i)
       }
 
+      for (i <- k + 1 until rows; j <- k + 1 until rows)
+        a(i)(j) -= l(i)(k) * u(k)(j)
+    }
+
+    for (i <- 0 until rows)
+      l(i)(i) = field.one
+
+    (Matrix.fromArray(l), Matrix.fromArray(u))
+  }
+
+  lazy val LUP: (ConcreteMatrix[F], ConcreteMatrix[F], ConcreteMatrix[F]) = {
+    require(isSquare, "LUP: must be a square matrix")
+
+    val a = array
+    val perm = Array.tabulate(rows)(identity)
+
+    for (k <- 0 until rows) {
+      var p = field.zero
+      var kp = 0
+
+      for (i <- k until rows)
+        if (field.abs(a(i)(k)) > p) {
+          p = field.abs(a(i)(k))
+          kp = i
+        }
+
+      if (p == field.zero)
+        sys.error("LUP: singular matrix")
+
+      val t = perm(k)
+
+      perm(k) = perm(kp)
+      perm(kp) = t
+      swap(k, kp, a)
+
+      for (i <- k + 1 until rows) {
+        a(i)(k) /= a(k)(k)
+
+        for (j <- k + 1 until rows)
+          a(i)(j) -= a(i)(k) * a(k)(j)
+      }
+    }
+
+    val l = build((i, j) => if (i > j) a(i - 1)(j - 1) else if (i == j) field.one else field.zero)
+    val u = build((i, j) => if (i <= j) a(i - 1)(j - 1) else field.zero)
+    val p = Array.fill[F](rows, cols)(field.zero)
+
+    for (i <- perm indices)
+      p(i)(perm(i)) = field.one
+
+    (l, u, Matrix.fromArray(p))
+  }
+
+  protected def swap(r1: Int, r2: Int, a: Array[Array[F]]): Unit =
+    for (i <- 0 until cols) {
+      val t = a(r1)(i)
+
+      a(r1)(i) = a(r2)(i)
+      a(r2)(i) = t
+    }
+
+  protected def echelon(reduced: Boolean): Array[Array[F]] = {
+    val a = array
+
     def one(r: Int): Unit = {
-      val pivot = array(r)(r)
+      val pivot = a(r)(r)
 
       if (pivot != field.one) {
         println(s"r${r + 1}/$pivot")
 
         for (i <- r until cols) {
-          array(r)(i) /= pivot
+          a(r)(i) /= pivot
         }
       }
     }
 
     def zero(rs: Int, rt: Int): Unit = {
-      val s = array(rt)(rs)
+      val s = a(rt)(rs)
 
       if (s != field.zero) {
-        array(rt)(rs) = field.zero
+        a(rt)(rs) = field.zero
 //        print(s"r${rt + 1} -= $s * r${rs + 1} --> 0 ")
 
         for (i <- rs + 1 until cols) {
-          array(rt)(i) -= s * array(rs)(i)
+          a(rt)(i) -= s * a(rs)(i)
 //          print(s"${array(rt)(i)} ")
         }
 
@@ -321,16 +390,16 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
 
     for (i <- 0 until (rows min cols)) {
-      if (array(i)(i) == field.zero) {
-        (i until rows filter (_ != i)).find(r => array(r)(i) != field.zero) match {
+      if (a(i)(i) == field.zero) {
+        (i until rows filter (_ != i)).find(r => a(r)(i) != field.zero) match {
           case Some(row) =>
 //            println(s"r${row + 1} <-> r${i + 1}")
-            swap(row, i)
+            swap(row, i, a)
           case None =>
         }
       }
 
-      if (array(i)(i) != field.zero) {
+      if (a(i)(i) != field.zero) {
         one(i)
 
         for (j <- (0 until (if (reduced) i else 0)) ++ (i + 1 until rows))
@@ -338,7 +407,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       }
     }
 
-    array
+    a
   }
 
   override def toString: String =
@@ -366,8 +435,11 @@ object Matrix {
   def apply[F](data: Seq[Seq[F]])(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
-    require(data forall (_.length == data.head.length), "Matrix must have rows of same length")
-    build(data.length, data.head.length, (x: Int, y: Int) => data(x - 1)(y - 1))
+
+    val width = data.head.length
+
+    require(data forall (_.length == width), "Matrix must have rows of same length")
+    Matrix.fromIndexedSeq(width, ArrayBuffer.concat[F](data: _*))
   }
 
   def rows[F](width: Int, elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
@@ -376,8 +448,8 @@ object Matrix {
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
-  def fromIndexedSeq[F](width: Int, elems: IndexedSeq[F])(implicit t: ClassTag[F],
-                                                          field: Fractional[F]): ConcreteMatrix[F] = {
+  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F],
+                                                                     field: Fractional[F]): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
     require(elems.length % width == 0, "wrong number of elements")
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
@@ -393,11 +465,11 @@ object Matrix {
   def build[F](rows: Int, cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) =
     new ConcreteMatrix[F](rows, cols, init)
 
-  def diagonal[F](size: Int, value: F)(implicit t: ClassTag[F], field: Fractional[F]) =
-    new ConcreteMatrix[F](size, size, (i, j) => if (i == j) value else field.zero)
+  def diagonal[F](size: Int, value: F)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] =
+    build[F](size, size, (i, j) => if (i == j) value else field.zero)
 
-  def zero[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]) =
-    new ConcreteMatrix[F](size, size, (_, _) => field.zero)
+  def zero[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] =
+    build[F](size, size, (_, _) => field.zero)
 
   def identity[F](size: Int)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = diagonal(size, field.one)
 
