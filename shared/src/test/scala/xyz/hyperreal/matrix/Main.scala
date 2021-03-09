@@ -1,6 +1,7 @@
 package xyz.hyperreal.matrix
 
-import xyz.hyperreal.dal.NumberIsFractional._
+import xyz.hyperreal.numbers.ComplexDouble
+import xyz.hyperreal.numbers.ComplexDoubleIsFractional._
 
 import math.Fractional.Implicits._
 
@@ -32,12 +33,16 @@ object Main extends App {
 ////  println(p)
 //  println(p * a == l * u)
 
-  val a = Matrix[Double](List(List(2, 0, 2, .6), List(3, 3, 4, -2), List(5, 5, 4, 2), List(-1, -2, 3.4, -1)))
-  val (l, u, p) = a.LUP
+//  val a = Matrix[Double](List(List(2, 0, 2, .6), List(3, 3, 4, -2), List(5, 5, 4, 2), List(-1, -2, 3.4, -1)))
+//  val (l, u, p) = a.LUP
+//
+//  println(a)
+//  println(l * u)
+//  println(p * a)
+//  println(p * a == l * u)
+
+  val a = Matrix[ComplexDouble](List(1, 2), List(3, 4))
 
   println(a)
-  println(l * u)
-  println(p * a)
-  println(p * a == l * u)
 
 }

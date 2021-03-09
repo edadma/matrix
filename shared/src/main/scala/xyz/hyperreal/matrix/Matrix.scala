@@ -1,11 +1,10 @@
 package xyz.hyperreal.matrix
 
-import scala.collection.immutable.{IndexedSeq, AbstractSeq, ArraySeq}
+import scala.collection.immutable.{AbstractSeq, ArraySeq, IndexedSeq}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import math.Fractional.Implicits._
 import math.Ordering.Implicits._
-
 import xyz.hyperreal.table.TextTable
 
 abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
@@ -140,7 +139,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     elem(idx % rows + 1, idx / rows + 1)
   }
 
-  lazy val vec: Matrix[F] = Matrix(map(Seq(_)))
+  lazy val vec: Matrix[F] = Matrix.fromIndexedSeq(1, this)
 
   def build(init: (Int, Int) => F) = new ConcreteMatrix(rows, cols, init)
 
@@ -410,7 +409,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     a
   }
 
-  override def toString: String =
+  def table: String =
     new TextTable(matrix = true) {
       for (i <- 1 to rows)
         rowSeq(Matrix.this.row(i))
@@ -418,11 +417,23 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
       1 to cols foreach rightAlignment
     }.toString
 
+  override def toString: String = {
+    val buf = new StringBuilder("Matrix(")
+
+    for (i <- 1 to rows) {
+      buf ++= row(i).mkString("[", ", ", "]")
+
+      if (i < rows)
+        buf ++= ", "
+    }
+
+    buf += ')'
+    buf.toString
+  }
+
 }
 
-class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F],
-                                                                             field: Fractional[F])
-    extends Matrix[F] {
+class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) extends Matrix[F] {
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
@@ -432,7 +443,7 @@ class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(imp
 
 object Matrix {
 
-  def apply[F](data: Seq[Seq[F]])(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
+  def apply[F](data: Seq[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
 
@@ -448,8 +459,7 @@ object Matrix {
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
-  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F],
-                                                                     field: Fractional[F]): ConcreteMatrix[F] = {
+  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
     require(elems.length % width == 0, "wrong number of elements")
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
@@ -484,8 +494,7 @@ object Matrix {
   }
 
   def cath[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.rows == mat.rows),
-            "Matrix.cath: matrices being horizontally concatenated must have same height")
+    require(mats.forall(m => m.rows == mat.rows), "Matrix.cath: matrices being horizontally concatenated must have same height")
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rcols = 0
@@ -501,8 +510,7 @@ object Matrix {
   }
 
   def catv[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.cols == mat.cols),
-            "Matrix.catv: matrices being vertically concatenated must have same width")
+    require(mats.forall(m => m.cols == mat.cols), "Matrix.catv: matrices being vertically concatenated must have same width")
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rrows = 0
