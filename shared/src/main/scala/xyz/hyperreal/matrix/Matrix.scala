@@ -443,6 +443,13 @@ class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(imp
 
 object Matrix {
 
+  object Implicits {
+    implicit def matrix2scalar[F](m: Matrix[F]): F = {
+      require(m.isColumn && m.isRow, "matrix is not 1x1")
+      m(1, 1)
+    }
+  }
+
   def apply[F](data: Seq[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
     require(data.nonEmpty, "Matrix cannot be empty")
     require(data forall (_.nonEmpty), "Matrix cannot have an empty row")
