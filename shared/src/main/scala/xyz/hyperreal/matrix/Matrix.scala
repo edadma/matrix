@@ -18,7 +18,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   override def equals(other: Any): Boolean =
     other match {
-      case that: Matrix[F] => (that canEqual this) && (elements forall { case (i, j, v) => v == that.elem(i, j) })
+      case that: Matrix[F] => (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall { case (i, j, v) => v == that.elem(i, j) })
       case _               => false
     }
 
