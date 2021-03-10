@@ -250,17 +250,17 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def -(that: Matrix[F]): Matrix[F] = sub(that)
 
-  def prod(that: Matrix[F]): F = {
+  def dot(that: Matrix[F]): F = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
     require(length == that.length, "Matrix.prod: operands must be of equal length")
-    this zip that map { case (a, b) => a * b } sum
+    this zip that map ((_: F) * (_: F)).tupled sum
   }
 
   def elemMul(that: Matrix[F]): Matrix[F] = operation(that, "Matrix.elemMul", _ * _)
 
   def mul(that: Matrix[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
-    new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) prod that.col(j))
+    new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) dot that.col(j))
   }
 
   def *(that: Matrix[F]): Matrix[F] = mul(that)
