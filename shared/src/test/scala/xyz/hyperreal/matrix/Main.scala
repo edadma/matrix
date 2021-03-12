@@ -41,8 +41,8 @@ object Main extends App {
 //  println(p * a)
 //  println(p * a == l * u)
 
-  val a = Matrix[ComplexDouble](List(1, 2), List(3, 4))
+  val a = Matrix[Double](List(1, 2), List(3, 4))
 
-  println(a)
+  println(a.norm)
 
 }

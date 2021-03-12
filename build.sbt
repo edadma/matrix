@@ -1,7 +1,7 @@
 lazy val matrix = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file(".")).
   settings(
     name := "matrix",
-    version := "0.1.0-snapshot.4",
+    version := "0.1.0-snapshot.5",
     scalaVersion := "2.13.5",
     scalacOptions ++=
       Seq(

@@ -68,6 +68,17 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   lazy val diagonal: Iterator[F] = (1 to (rows min cols)).iterator map (i => elem(i, i))
 
+  lazy val norm: F = {
+    var sum: F = field.zero
+
+    for (i <- 1 to rows; j <- 1 to cols)
+      sum += elem(i, j).abs*elem(i, j).abs
+
+    (sum match {
+      case d: Double => math.sqrt(d)
+    }).asInstanceOf[F]
+  }
+
   def submatrix(i: Int, j: Int): Matrix[F] = {
     boundsCheck(i, j, s"submatrix")
     removeRow(i).removeCol(j)
