@@ -18,8 +18,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   override def equals(other: Any): Boolean =
     other match {
-      case that: Matrix[F] => (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall { case (i, j, v) => v == that.elem(i, j) })
-      case _               => false
+      case that: Matrix[F] =>
+        (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall {
+          case (i, j, v) => v == that.elem(i, j)
+        })
+      case _ => false
     }
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[Matrix[F]]
@@ -72,7 +75,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     var sum: F = field.zero
 
     for (i <- 1 to rows; j <- 1 to cols)
-      sum += elem(i, j).abs*elem(i, j).abs
+      sum += elem(i, j).abs * elem(i, j).abs
 
     (sum match {
       case d: Double => math.sqrt(d)
@@ -156,22 +159,46 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def concrete: Matrix[F] = build(elem)
 
-  def prepend(v: Matrix[F]): Matrix[F] = {
-    require(v.isVector, "can only prepend a row or column vector")
-
-    if (v.isColumn)
-      Matrix.cath(v, this)
-    else
-      Matrix.catv(v, this)
+  def prependRow(v: Matrix[F]): Matrix[F] = {
+    require(v.isRow, "can only prepend a row vector")
+    Matrix.catv(v, this)
   }
 
-  def append(v: Matrix[F]): Matrix[F] = {
-    require(v.isVector, "can only append a row or column vector")
+  def prependCol(v: Matrix[F]): Matrix[F] = {
+    require(v.isColumn, "can only prepend a column vector")
+    Matrix.cath(v, this)
+  }
 
-    if (v.isColumn)
-      Matrix.cath(this, v)
-    else
-      Matrix.catv(this, v)
+  def appendRow(v: Matrix[F]): Matrix[F] = {
+    require(v.isRow, "can only append a row vector")
+    Matrix.catv(this, v)
+  }
+
+  def appendCol(v: Matrix[F]): Matrix[F] = {
+    require(v.isColumn, "can only append a column vector")
+    Matrix.cath(this, v)
+  }
+
+  def replaceRow(v: Matrix[F], idx: Int): Matrix[F] = {
+    require(v.isRow, "can only replace a row vector")
+
+    if (v.isColumn) {
+      require(1 <= idx && idx <= cols, s"column index out of range: $idx")
+
+      idx match {
+        case 1      => Matrix.cath(v, removeCol(1))
+        case `cols` => Matrix.cath(removeCol(cols), v)
+        case _      => Matrix.cath(block(1, rows, 1, idx - 1), v, block(1, rows, idx + 1, cols - idx))
+      }
+    } else {
+      require(1 <= idx && idx <= rows, s"row index out of range: $idx")
+
+      idx match {
+        case 1      => Matrix.catv(v, removeRow(1))
+        case `rows` => Matrix.catv(removeRow(cols), v)
+        case _      => Matrix.catv(block(1, idx - 1, 1, cols), v, block(idx + 1, rows - idx, 1, cols))
+      }
+    }
   }
 
   def replace(v: Matrix[F], idx: Int): Matrix[F] = {
@@ -444,7 +471,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
 }
 
-class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F], field: Fractional[F]) extends Matrix[F] {
+class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F],
+                                                                             field: Fractional[F])
+    extends Matrix[F] {
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
@@ -477,7 +506,8 @@ object Matrix {
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
-  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F],
+                                                                     field: Fractional[F]): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
     require(elems.length % width == 0, "wrong number of elements")
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
@@ -512,7 +542,8 @@ object Matrix {
   }
 
   def cath[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.rows == mat.rows), "Matrix.cath: matrices being horizontally concatenated must have same height")
+    require(mats.forall(m => m.rows == mat.rows),
+            "Matrix.cath: matrices being horizontally concatenated must have same height")
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rcols = 0
@@ -528,7 +559,8 @@ object Matrix {
   }
 
   def catv[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.cols == mat.cols), "Matrix.catv: matrices being vertically concatenated must have same width")
+    require(mats.forall(m => m.cols == mat.cols),
+            "Matrix.catv: matrices being vertically concatenated must have same width")
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rrows = 0
