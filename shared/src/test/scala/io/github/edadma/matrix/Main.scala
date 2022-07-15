@@ -1,4 +1,4 @@
-package xyz.hyperreal.matrix
+package io.github.edadma.matrix
 
 import xyz.hyperreal.numbers.ComplexDouble
 import xyz.hyperreal.numbers.ComplexDoubleIsFractional._

@@ -1,11 +1,11 @@
-package xyz.hyperreal.matrix
+package io.github.edadma.matrix
 
 import scala.collection.immutable.{AbstractSeq, ArraySeq, IndexedSeq}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import math.Fractional.Implicits._
 import math.Ordering.Implicits._
-import xyz.hyperreal.table.TextTable
+import io.github.edadma.TextTable
 
 abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     extends AbstractSeq[F]
@@ -84,7 +84,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def submatrix(i: Int, j: Int): Matrix[F] = {
     boundsCheck(i, j, s"submatrix")
-    removeRow(i).removeCol(j)
+    removeRowView(i).removeColView(j)
   }
 
   def minor(i: Int, j: Int): F = {
@@ -159,6 +159,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def concrete: Matrix[F] = build(elem)
 
+  def insert(m: Matrix[F]): Unit
+
   def prependRow(v: Matrix[F]): Matrix[F] = {
     require(v.isRow, "can only prepend a row vector")
     Matrix.catv(v, this)
@@ -184,9 +186,9 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(1 <= idx && idx <= rows, s"row index out of range: $idx")
 
     idx match {
-      case 1      => Matrix.catv(v, removeRow(1))
-      case `rows` => Matrix.catv(removeRow(cols), v)
-      case _      => Matrix.catv(block(1, idx - 1, 1, cols), v, block(idx + 1, rows - idx, 1, cols))
+      case 1      => Matrix.catv(v, removeRowView(1))
+      case `rows` => Matrix.catv(removeRowView(cols), v)
+      case _      => Matrix.catv(blockView(1, idx - 1, 1, cols), v, blockView(idx + 1, rows - idx, 1, cols))
     }
   }
 
@@ -195,13 +197,13 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     require(1 <= idx && idx <= cols, s"column index out of range: $idx")
 
     idx match {
-      case 1      => Matrix.cath(v, removeCol(1))
-      case `cols` => Matrix.cath(removeCol(cols), v)
-      case _      => Matrix.cath(block(1, rows, 1, idx - 1), v, block(1, rows, idx + 1, cols - idx))
+      case 1      => Matrix.cath(v, removeColView(1))
+      case `cols` => Matrix.cath(removeColView(cols), v)
+      case _      => Matrix.cath(blockView(1, rows, 1, idx - 1), v, blockView(1, rows, idx + 1, cols - idx))
     }
   }
 
-  def block(ridx: Int, height: Int, cidx: Int, width: Int): Matrix[F] = {
+  def blockView(ridx: Int, height: Int, cidx: Int, width: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.view: row out of range: $ridx")
     require(1 <= cidx && cidx <= cols, s"Matrix.view: col out of range: $cidx")
     require(1 <= height && height <= rows, s"Matrix.view: height out of range: $height")
@@ -217,7 +219,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  def removeRow(ridx: Int): Matrix[F] = {
+  def removeRowView(ridx: Int): Matrix[F] = {
     require(1 <= ridx && ridx <= rows, s"Matrix.removeRow: row out of range: $ridx")
 
     val outer = this
@@ -230,7 +232,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  def removeCol(cidx: Int): Matrix[F] = {
+  def removeColView(cidx: Int): Matrix[F] = {
     require(1 <= cidx && cidx <= cols, s"Matrix.removeCol: column out of range: $cidx")
 
     val outer = this
@@ -243,9 +245,13 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     }
   }
 
-  def row(ridx: Int): Matrix[F] = block(ridx, 1, 1, cols)
+  def rowView(ridx: Int): Matrix[F] = blockView(ridx, 1, 1, cols)
 
-  def col(cidx: Int): Matrix[F] = block(1, rows, cidx, 1)
+  def row(ridx: Int): Matrix[F] = rowView(ridx).concrete
+
+  def colView(cidx: Int): Matrix[F] = blockView(1, rows, cidx, 1)
+
+  def col(cidx: Int): Matrix[F] = colView(cidx)
 
   def operation(that: Matrix[F], name: String, op: (F, F) => F): Matrix[F] = {
     require(rows == that.rows && cols == that.cols, s"$name: operand matrices must be of equal dimension")
@@ -276,7 +282,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def mul(that: Matrix[F]): Matrix[F] = {
     require(cols == that.rows, "Matrix.mul: width of left operand must equal height of right operand")
-    new ConcreteMatrix(rows, that.cols, (i, j) => this.row(i) dot that.col(j))
+    new ConcreteMatrix(rows, that.cols, (i, j) => this.rowView(i) dot that.colView(j))
   }
 
   def *(that: Matrix[F]): Matrix[F] = mul(that)
@@ -428,7 +434,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   def table: String =
     new TextTable(matrix = true) {
       for (i <- 1 to rows)
-        rowSeq(Matrix.this.row(i))
+        rowSeq(Matrix.this.rowView(i))
 
       1 to cols foreach rightAlignment
     }.toString
@@ -437,7 +443,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     val buf = new StringBuilder("Matrix(")
 
     for (i <- 1 to rows) {
-      buf ++= row(i).mkString("[", ", ", "]")
+      buf ++= rowView(i).mkString("[", ", ", "]")
 
       if (i < rows)
         buf ++= ", "
