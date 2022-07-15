@@ -10,6 +10,7 @@ lazy val matrix = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file(
       Seq(
         "-deprecation", "-feature", "-unchecked",
         "-language:postfixOps", "-language:implicitConversions", "-language:existentials", "-language:dynamics",
+        "-explain"
       ),
     organization := "io.github.edadma",
     githubOwner := "edadma",

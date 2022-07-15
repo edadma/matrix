@@ -1,7 +1,7 @@
 package io.github.edadma.matrix
 
-import xyz.hyperreal.numbers.ComplexDouble
-import xyz.hyperreal.numbers.ComplexDoubleIsFractional._
+import io.github.edadma.numbers.ComplexDouble
+import io.github.edadma.numbers.ComplexDoubleIsFractional._
 
 import math.Fractional.Implicits._
 

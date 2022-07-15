@@ -3,9 +3,11 @@ package io.github.edadma.matrix
 import scala.collection.immutable.{AbstractSeq, ArraySeq, IndexedSeq}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
-import math.Fractional.Implicits._
-import math.Ordering.Implicits._
-import io.github.edadma.TextTable
+import math.Fractional.Implicits.*
+import math.Ordering.Implicits.*
+import io.github.edadma.table.TextTable
+
+import scala.language.postfixOps
 
 abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     extends AbstractSeq[F]
@@ -19,8 +21,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   override def equals(other: Any): Boolean =
     other match {
       case that: Matrix[F] =>
-        (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall {
-          case (i, j, v) => v == that.elem(i, j)
+        (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall { case (i, j, v) =>
+          v == that.elem(i, j)
         })
       case _ => false
     }
@@ -74,8 +76,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   lazy val norm: F = {
     var sum: F = field.zero
 
-    for (i <- 1 to rows; j <- 1 to cols)
-      sum += elem(i, j).abs * elem(i, j).abs
+    for (i <- 1 to rows; j <- 1 to cols) {
+      val aij = elem(i, j).abs
+
+      sum += aij * aij
+    }
 
     (sum match {
       case d: Double => math.sqrt(d)
@@ -159,7 +164,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def concrete: Matrix[F] = build(elem)
 
-  def insert(m: Matrix[F]): Unit
+//  def insert(m: Matrix[F]): Unit
 
   def prependRow(v: Matrix[F]): Matrix[F] = {
     require(v.isRow, "can only prepend a row vector")
@@ -455,9 +460,10 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
 }
 
-class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit t: ClassTag[F],
-                                                                             field: Fractional[F])
-    extends Matrix[F] {
+class ConcreteMatrix[F](val rows: Int, val cols: Int, init: (Int, Int) => F)(implicit
+    t: ClassTag[F],
+    field: Fractional[F],
+) extends Matrix[F] {
 
   private val data = ArraySeq.tabulate[F](rows, cols)((i: Int, j: Int) => init(i + 1, j + 1))
 
@@ -490,8 +496,10 @@ object Matrix {
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
   }
 
-  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit t: ClassTag[F],
-                                                                     field: Fractional[F]): ConcreteMatrix[F] = {
+  def fromIndexedSeq[F](width: Int, elems: collection.IndexedSeq[F])(implicit
+      t: ClassTag[F],
+      field: Fractional[F],
+  ): ConcreteMatrix[F] = {
     require(elems.nonEmpty, "matrix cannot be empty")
     require(elems.length % width == 0, "wrong number of elements")
     build(elems.length / width, width, (i, j) => elems((i - 1) * width + j - 1))
@@ -526,8 +534,10 @@ object Matrix {
   }
 
   def cath[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.rows == mat.rows),
-            "Matrix.cath: matrices being horizontally concatenated must have same height")
+    require(
+      mats.forall(m => m.rows == mat.rows),
+      "Matrix.cath: matrices being horizontally concatenated must have same height",
+    )
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rcols = 0
@@ -543,8 +553,10 @@ object Matrix {
   }
 
   def catv[F](mat: Matrix[F], mats: Matrix[F]*)(implicit t: ClassTag[F], field: Fractional[F]): Matrix[F] = {
-    require(mats.forall(m => m.cols == mat.cols),
-            "Matrix.catv: matrices being vertically concatenated must have same width")
+    require(
+      mats.forall(m => m.cols == mat.cols),
+      "Matrix.catv: matrices being vertically concatenated must have same width",
+    )
 
     val ms = new ArrayBuffer[(Matrix[F], Int)]
     var rrows = 0
