@@ -1,16 +1,22 @@
 ThisBuild / licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
 ThisBuild / versionScheme := Some("semver-spec")
 
-lazy val matrix = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file(".")).
-  settings(
+lazy val matrix = crossProject(JSPlatform, JVMPlatform, NativePlatform)
+  .in(file("."))
+  .settings(
     name := "matrix",
-    version := "0.1.1",
+    version := "0.1.2",
     scalaVersion := "3.1.3",
     scalacOptions ++=
       Seq(
-        "-deprecation", "-feature", "-unchecked",
-        "-language:postfixOps", "-language:implicitConversions", "-language:existentials", "-language:dynamics",
-        "-explain"
+        "-deprecation",
+        "-feature",
+        "-unchecked",
+        "-language:postfixOps",
+        "-language:implicitConversions",
+        "-language:existentials",
+        "-language:dynamics",
+        "-explain",
       ),
     organization := "io.github.edadma",
     githubOwner := "edadma",
@@ -23,15 +29,15 @@ lazy val matrix = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file(
     ),
     publishMavenStyle := true,
     Test / publishArtifact := false,
-    licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
-  ).
-  jvmSettings(
+    licenses += "ISC" -> url("https://opensource.org/licenses/ISC"),
+  )
+  .jvmSettings(
     libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % "provided",
-  ).
-  nativeSettings(
-    nativeLinkStubs := true
-  ).
-  jsSettings(
+  )
+  .nativeSettings(
+    nativeLinkStubs := true,
+  )
+  .jsSettings(
     jsEnv := new org.scalajs.jsenv.nodejs.NodeJSEnv(),
     Test / scalaJSUseMainModuleInitializer := true,
     Test / scalaJSUseTestModuleInitializer := false,
