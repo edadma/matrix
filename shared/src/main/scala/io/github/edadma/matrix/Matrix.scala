@@ -20,14 +20,14 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   override def equals(other: Any): Boolean =
     other match {
-      case that: Matrix[F] =>
+      case that: Matrix[F] @unchecked =>
         (that canEqual this) && rows == that.rows && cols == that.cols && (elements forall { case (i, j, v) =>
           v == that.elem(i, j)
         })
       case _ => false
     }
 
-  override def canEqual(other: Any): Boolean = other.isInstanceOf[Matrix[F]]
+  override infix def canEqual(other: Any): Boolean = other.isInstanceOf[Matrix[?]]
 
   override def hashCode: Int = map(_.hashCode) reduce (_ ^ _)
 
@@ -277,7 +277,7 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
 
   def -(that: Matrix[F]): Matrix[F] = sub(that)
 
-  def dot(that: Matrix[F]): F = {
+  infix def dot(that: Matrix[F]): F = {
     require(isVector && that.isVector, "Matrix.prod: operands must be vectors")
     require(length == that.length, "Matrix.prod: operands must be of equal length")
     this zip that map ((_: F) * (_: F)).tupled sum
@@ -487,7 +487,7 @@ object Matrix {
     val width = data.head.length
 
     require(data forall (_.length == width), "Matrix must have rows of same length")
-    Matrix.fromIndexedSeq(width, ArrayBuffer.concat[F](data: _*))
+    Matrix.fromIndexedSeq(width, ArrayBuffer.concat[F](data*))
   }
 
   def rows[F](width: Int, elems: F*)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
