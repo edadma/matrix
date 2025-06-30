@@ -141,8 +141,8 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     val outer = this
 
     new Matrix {
-      val rows: Int = outer.rows
-      val cols: Int = outer.cols
+      val rows: Int = outer.cols
+      val cols: Int = outer.rows
 
       def elem(i: Int, j: Int): F = outer.elem(j, i)
     }
