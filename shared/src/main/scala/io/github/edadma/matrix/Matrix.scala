@@ -7,7 +7,7 @@ import math.Fractional.Implicits.*
 import math.Ordering.Implicits.*
 import io.github.edadma.table.TextTable
 
-import scala.language.postfixOps
+import scala.language.{implicitConversions, postfixOps}
 
 abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
     extends AbstractSeq[F]
@@ -336,11 +336,11 @@ abstract class Matrix[F](implicit classTag: ClassTag[F], field: Fractional[F])
   lazy val LUP: (ConcreteMatrix[F], ConcreteMatrix[F], ConcreteMatrix[F]) = {
     require(isSquare, "LUP: must be a square matrix")
 
-    val a = array
+    val a    = array
     val perm = Array.tabulate(rows)(identity)
 
     for (k <- 0 until rows) {
-      var p = field.zero
+      var p  = field.zero
       var kp = 0
 
       for (i <- k until rows)
@@ -539,7 +539,7 @@ object Matrix {
       "Matrix.cath: matrices being horizontally concatenated must have same height",
     )
 
-    val ms = new ArrayBuffer[(Matrix[F], Int)]
+    val ms    = new ArrayBuffer[(Matrix[F], Int)]
     var rcols = 0
 
     for (m <- mat +: mats) {
@@ -558,7 +558,7 @@ object Matrix {
       "Matrix.catv: matrices being vertically concatenated must have same width",
     )
 
-    val ms = new ArrayBuffer[(Matrix[F], Int)]
+    val ms    = new ArrayBuffer[(Matrix[F], Int)]
     var rrows = 0
 
     for (m <- mat +: mats) {
@@ -569,6 +569,18 @@ object Matrix {
     }
 
     build(rrows, mat.cols, (i, j) => ms(i - 1)._1(ms(i - 1)._2, j))
+  }
+
+  def fill[F](rows: Int, cols: Int)(value: => F)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+    require(rows > 0, "Matrix.fill: rows must be positive")
+    require(cols > 0, "Matrix.fill: cols must be positive")
+    build(rows, cols, (_, _) => value)
+  }
+
+  // Overloaded version for square matrices
+  def fill[F](size: Int)(value: => F)(implicit t: ClassTag[F], field: Fractional[F]): ConcreteMatrix[F] = {
+    require(size > 0, "Matrix.fill: size must be positive")
+    fill(size, size)(value)
   }
 
 }

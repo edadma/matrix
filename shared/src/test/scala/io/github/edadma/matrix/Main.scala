@@ -5,7 +5,7 @@ import io.github.edadma.numbers.ComplexDoubleIsFractional._
 
 import math.Fractional.Implicits._
 
-object Main extends App {
+@main def run(): Unit = {
 
 //  val a = Matrix[Number](List(List(3, 2, -5), List(1, -3, 2), List(5, -1, 4)))
 //
